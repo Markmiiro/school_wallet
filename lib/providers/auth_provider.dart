@@ -1,2 +1,99 @@
-// ChangeNotifier for auth state — isLoggedIn, currentUser, etc.
+// ChangeNotifier holding authentication state for the whole app.
+// Screens listen to this via Provider/context.watch instead of
+// calling AuthService directly.
 
+import 'package:flutter/material.dart';
+import '../data/services/auth_service.dart';
+import '../data/models/auth_user.dart';
+
+class AuthProvider extends ChangeNotifier {
+  final AuthService _authService = AuthService();
+
+  bool isLoading = false;
+  bool isInitialized = false;
+  String? errorMessage;
+
+  bool isLoggedIn = false;
+  AuthUser? currentUser;
+
+  /// Called once at app startup to check for an existing session
+  /// (e.g. from secure storage) before showing Login or Home.
+  Future<void> checkExistingSession() async {
+    isLoading = true;
+    notifyListeners();
+
+    final user = await _authService.checkExistingSession();
+
+    if (user != null) {
+      currentUser = user;
+      isLoggedIn = true;
+    } else {
+      isLoggedIn = false;
+      currentUser = null;
+    }
+
+    isLoading = false;
+    isInitialized = true;
+    notifyListeners();
+  }
+
+  Future<bool> login(String phone, String pin) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    final result = await _authService.login(phone, pin);
+
+    if (result.success) {
+      currentUser = result.user;
+      isLoggedIn = true;
+      isLoading = false;
+      notifyListeners();
+      return true;
+    } else {
+      errorMessage = result.errorMessage;
+      isLoggedIn = false;
+      isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> register({
+    required String name,
+    required String phone,
+    required String pin,
+  }) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    final result = await _authService.register(
+      name: name,
+      phone: phone,
+      pin: pin,
+    );
+
+    isLoading = false;
+
+    if (result.success) {
+      if (result.user != null) {
+        currentUser = result.user;
+        isLoggedIn = true;
+      }
+      notifyListeners();
+      return true;
+    } else {
+      errorMessage = result.errorMessage;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> logout() async {
+    await _authService.logout();
+    isLoggedIn = false;
+    currentUser = null;
+    notifyListeners();
+  }
+}
