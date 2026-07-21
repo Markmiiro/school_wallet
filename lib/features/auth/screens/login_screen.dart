@@ -1,7 +1,7 @@
 // Real Login screen, styled from the Stitch design export.
 // Phone number + 4-digit PIN (pinput), shake + inline error on
-// incomplete/invalid PIN, loading state on submit, and a subtle
-// entrance animation via flutter_animate.
+// incomplete/invalid PIN, loading state on submit, a link to
+// Registration, and a subtle entrance animation via flutter_animate.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,8 +55,6 @@ class _LoginScreenState extends State<LoginScreen>
     final rawPhone = _phoneController.text.trim();
     final pin = _pinController.text.trim();
 
-    // Validate PIN completeness first — this is the "shake + inline
-    // error" case requested.
     if (pin.length != 4) {
       setState(() => _pinError = 'Enter all 4 digits of your PIN.');
       _triggerShake();
@@ -302,7 +300,23 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.05, end: 0),
 
-              const SizedBox(height: AppTheme.spaceXl),
+              const SizedBox(height: AppTheme.spaceLg),
+
+              // Link to Registration
+              Center(
+                child: TextButton(
+                  onPressed: () => context.go('/register'),
+                  child: Text(
+                    'New here? Create an account',
+                    style: AppTheme.bodySm.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ).animate().fadeIn(delay: 300.ms),
+
+              const SizedBox(height: AppTheme.spaceMd),
 
               Center(
                 child: Column(
