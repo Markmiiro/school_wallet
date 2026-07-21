@@ -2,6 +2,8 @@
 // animated balance count-up, staggered fade/slide entrance, and a
 // friendly empty state. Pull-to-refresh reloads from the backend.
 // Tapping a child's card navigates to their Child Wallet Detail screen.
+// The profile icon in the app bar opens the Profile screen (which
+// holds the Log Out and Change PIN actions).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -49,11 +51,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('Home'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () async {
-              await authProvider.logout();
-              if (context.mounted) context.go('/login');
-            },
+            icon: const Icon(Icons.person_rounded),
+            tooltip: 'Profile',
+            onPressed: () => context.push('/profile'),
           ),
         ],
       ),
