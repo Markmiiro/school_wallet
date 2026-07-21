@@ -50,25 +50,34 @@ class WalletService {
       throw Exception('Failed to load wallet (${response.statusCode})');
     }
   }
-/// POST /students/
+
+  /// POST /students/
   /// Registers a new child under the given parent. parentId should
   /// always come from the logged-in user's own session (AuthProvider),
   /// never typed in by hand — the backend does not yet verify this
   /// server-side, so the app must be careful not to let this be spoofed.
+  ///
+  /// NOTE: the backend's create_student route declares name/school_id/
+  /// parent_id as plain function parameters (no Pydantic body model),
+  /// which FastAPI binds as QUERY parameters, not JSON body fields.
+  /// Confirmed live on 21 July 2026 — sending these as a JSON body
+  /// produces a 422 "Field required" error for all three fields.
   Future<Student> createStudent({
     required String name,
     required int schoolId,
     required int parentId,
   }) async {
     final headers = await ApiClient.authHeaders();
-    final response = await http.post(
-      Uri.parse(ApiConstants.createStudent),
-      headers: headers,
-      body: jsonEncode({
+    final uri = Uri.parse(ApiConstants.createStudent).replace(
+      queryParameters: {
         'name': name,
-        'school_id': schoolId,
-        'parent_id': parentId,
-      }),
+        'school_id': schoolId.toString(),
+        'parent_id': parentId.toString(),
+      },
+    );
+    final response = await http.post(
+      uri,
+      headers: headers,
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
