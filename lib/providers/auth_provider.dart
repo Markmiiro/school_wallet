@@ -112,6 +112,38 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
+  /// Changes the PIN, then logs the user out (the backend invalidates
+  /// the session on success and requires re-login with the new PIN).
+  /// Returns true on success.
+  Future<bool> changePin({
+    required String currentPin,
+    required String newPin,
+  }) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    final result = await _authService.changePin(
+      currentPin: currentPin,
+      newPin: newPin,
+    );
+
+    isLoading = false;
+
+    if (result.success) {
+      // Backend invalidates the old session; clear it locally too.
+      await _authService.logout();
+      isLoggedIn = false;
+      currentUser = null;
+      notifyListeners();
+      return true;
+    } else {
+      errorMessage = result.errorMessage;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _authService.logout();
     isLoggedIn = false;

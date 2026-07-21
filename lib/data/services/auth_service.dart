@@ -1,4 +1,4 @@
-// Handles login, registration, session check, and logout.
+// Handles login, registration, session check, logout, and PIN change.
 // Talks to the confirmed /auth/* endpoints on the backend.
 
 import 'dart:convert';
@@ -116,6 +116,55 @@ class AuthService {
     final userJson = await ApiClient.getStoredUserJson();
     if (token == null || userJson == null) return null;
     return AuthUser.fromJson(jsonDecode(userJson));
+  }
+
+  /// POST /auth/change-pin
+  /// Requires the current PIN for verification. Returns success on 200.
+  /// NOTE: the backend invalidates the session on success ("Please
+  /// login again with your new PIN"), so the caller should log the
+  /// user out afterward.
+  Future<AuthResult> changePin({
+    required String currentPin,
+    required String newPin,
+  }) async {
+    try {
+      final headers = await ApiClient.authHeaders();
+      final response = await http
+          .post(
+            Uri.parse(ApiConstants.changePin),
+            headers: headers,
+            body: jsonEncode({
+              'current_pin': currentPin,
+              'new_pin': newPin,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return AuthResult(success: true);
+      } else {
+        // Validation errors come as a list under 'detail'; simple
+        // errors come as a string.
+        final detail = data['detail'];
+        if (detail is List && detail.isNotEmpty) {
+          return AuthResult(
+            success: false,
+            errorMessage: detail.first['msg'] ?? 'Could not change PIN.',
+          );
+        }
+        return AuthResult(
+          success: false,
+          errorMessage: detail?.toString() ?? 'Could not change PIN.',
+        );
+      }
+    } catch (e) {
+      return AuthResult(
+        success: false,
+        errorMessage: 'Could not reach the server. Check your connection.',
+      );
+    }
   }
 
   Future<void> logout() async {
