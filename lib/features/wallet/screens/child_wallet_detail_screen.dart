@@ -1,6 +1,6 @@
 // Child Wallet Detail screen. Shows balance (animated count-up),
-// daily limit, and recent transaction history for a single student.
-// Reached by tapping a child's card on the Dashboard.
+// summary tiles, a Top Up button, and recent transaction history for
+// a single student. Reached by tapping a child's card on the Dashboard.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -11,6 +11,7 @@ import '../../../core/widgets/animated_balance_counter.dart';
 import '../../../data/models/student.dart';
 import '../../../data/models/wallet_history.dart';
 import '../../../data/services/wallet_service.dart';
+import 'top_up_screen.dart';
 
 class ChildWalletDetailScreen extends StatefulWidget {
   final Student student;
@@ -159,11 +160,20 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () {
-              // Top-Up screen not built yet — placeholder for now.
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Top-Up screen coming soon.')),
+            onPressed: () async {
+              final didTopUp = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(
+                  builder: (context) => TopUpScreen(
+                    walletId: history.walletId,
+                    studentName: widget.student.name,
+                  ),
+                ),
               );
+              // If the top-up completed, reload this screen's data so
+              // the new balance and transaction show up.
+              if (didTopUp == true) {
+                _load();
+              }
             },
             icon: const Icon(Icons.add_card_rounded),
             label: const Text('Top Up'),
