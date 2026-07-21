@@ -1,11 +1,9 @@
 // go_router configuration — all app routes in one place.
-// Only /login and /dashboard exist for now; more routes (top-up,
-// transaction history, profile, change-pin) get added here as each
-// screen is built in later steps.
 
 import 'package:go_router/go_router.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
+import '../../features/wallet/screens/add_child_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -20,6 +18,10 @@ class AppRouter {
       GoRoute(
         path: '/dashboard',
         builder: (context, state) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: '/add-child',
+        builder: (context, state) => const AddChildScreen(),
       ),
     ],
   );
