@@ -50,4 +50,26 @@ class WalletProvider extends ChangeNotifier {
   }
 
   WalletBalance? balanceFor(int studentId) => balances[studentId];
+
+  Future<bool> createStudent({
+    required String name,
+    required int schoolId,
+    required int parentId,
+  }) async {
+    try {
+      await _walletService.createStudent(
+        name: name,
+        schoolId: schoolId,
+        parentId: parentId,
+      );
+      // Reload the full list so the new student (with its
+      // auto-created wallet) shows up immediately.
+      await loadForParent(parentId);
+      return true;
+    } catch (e) {
+      errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
 }
