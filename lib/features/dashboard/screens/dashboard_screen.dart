@@ -1,6 +1,7 @@
 // Real Dashboard screen. Lists the parent's children as cards with
 // animated balance count-up, staggered fade/slide entrance, and a
 // friendly empty state. Pull-to-refresh reloads from the backend.
+// Tapping a child's card navigates to their Child Wallet Detail screen.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -11,6 +12,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/animated_balance_counter.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
+import '../../wallet/screens/child_wallet_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -96,7 +98,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-if (walletProvider.students.isEmpty) {
+    if (walletProvider.students.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -115,6 +117,7 @@ if (walletProvider.students.isEmpty) {
         ),
       ).animate().fadeIn(duration: 400.ms);
     }
+
     return ListView.builder(
       padding: const EdgeInsets.all(AppTheme.marginMobile),
       itemCount: walletProvider.students.length,
@@ -122,7 +125,19 @@ if (walletProvider.students.isEmpty) {
         final student = walletProvider.students[index];
         final balance = walletProvider.balanceFor(student.id);
 
-        return Container(
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      ChildWalletDetailScreen(student: student),
+                ),
+              );
+            },
+            child: Container(
               margin: const EdgeInsets.only(bottom: AppTheme.spaceMd),
               padding: const EdgeInsets.all(AppTheme.spaceLg),
               decoration: BoxDecoration(
@@ -173,7 +188,9 @@ if (walletProvider.students.isEmpty) {
                       color: AppColors.onSurfaceVariant),
                 ],
               ),
-            )
+            ),
+          ),
+        )
             .animate()
             .fadeIn(delay: (index * 100).ms, duration: 400.ms)
             .slideY(begin: 0.1, end: 0);
