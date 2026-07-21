@@ -59,6 +59,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Registers a new parent account, then ensures they end up logged in.
+  /// If /auth/register returns a token/user directly, we use it. If not,
+  /// we log in immediately with the same credentials so the user still
+  /// lands on the dashboard.
   Future<bool> register({
     required String name,
     required String phone,
@@ -74,20 +78,38 @@ class AuthProvider extends ChangeNotifier {
       pin: pin,
     );
 
-    isLoading = false;
-
-    if (result.success) {
-      if (result.user != null) {
-        currentUser = result.user;
-        isLoggedIn = true;
-      }
+    // If registration returned a session directly, we're done.
+    if (result.success && result.user != null) {
+      currentUser = result.user;
+      isLoggedIn = true;
+      isLoading = false;
       notifyListeners();
       return true;
-    } else {
-      errorMessage = result.errorMessage;
-      notifyListeners();
-      return false;
     }
+
+    // Registration succeeded but no token/user was returned — log in
+    // immediately with the same credentials.
+    if (result.success) {
+      final loginResult = await _authService.login(phone, pin);
+      isLoading = false;
+      if (loginResult.success) {
+        currentUser = loginResult.user;
+        isLoggedIn = true;
+        notifyListeners();
+        return true;
+      } else {
+        errorMessage =
+            'Account created. Please log in with your new details.';
+        notifyListeners();
+        return false;
+      }
+    }
+
+    // Registration itself failed.
+    errorMessage = result.errorMessage;
+    isLoading = false;
+    notifyListeners();
+    return false;
   }
 
   Future<void> logout() async {
