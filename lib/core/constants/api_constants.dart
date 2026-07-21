@@ -49,13 +49,31 @@ class ApiConstants {
   static String walletHistory(int studentId, {int limit = 20}) =>
       '$baseUrl/wallets/$studentId/history?limit=$limit';
 
+  // ── Top-Up ────────────────────────────────────────────────
+  // Confirmed from app/routes/topup.py on 21 July 2026.
+  // POST /topup/ takes a JSON body (real Pydantic model, unlike
+  // create_student which used query params). The response is always
+  // "pending" — the wallet is credited later via webhook/polling, not
+  // synchronously. Validation: amount 500–5,000,000 UGX, phone must be
+  // 256XXXXXXXXX (12 digits), network must be "MTN" or "AIRTEL".
+  static const String topup = '$baseUrl/topup/';
+
+  // GET /topup/{reference_id} — poll status: pending | completed | failed
+  static String topupStatus(String referenceId) =>
+      '$baseUrl/topup/$referenceId';
+
+  // GET /topup/history/{wallet_id} — top-up history for a wallet.
+  // Not wired into the app yet, but confirmed available.
+  static String topupHistory(int walletId, {int limit = 10}) =>
+      '$baseUrl/topup/history/$walletId?limit=$limit';
+
   // ── Schools ───────────────────────────────────────────────
   static const String schools = '$baseUrl/schools/';
 
   // ── Not yet wired into the app — placeholders for future features ──
-  // topup.py, merchants.py, payments.py, ussd.py, reports.py,
-  // analytics.py, tuckshop.py, webhook.py exist on the backend but
-  // aren't consumed by the parent-facing app yet. Add their confirmed
-  // paths here as each feature gets built — do not guess at paths,
-  // verify from source first (same standard as everything above).
+  // merchants.py, payments.py, ussd.py, reports.py, analytics.py,
+  // tuckshop.py, webhook.py exist on the backend but aren't consumed by
+  // the parent-facing app yet. Add their confirmed paths here as each
+  // feature gets built — do not guess at paths, verify from source first
+  // (same standard as everything above).
 }
