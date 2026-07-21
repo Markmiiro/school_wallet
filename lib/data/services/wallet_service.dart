@@ -50,4 +50,34 @@ class WalletService {
       throw Exception('Failed to load wallet (${response.statusCode})');
     }
   }
+/// POST /students/
+  /// Registers a new child under the given parent. parentId should
+  /// always come from the logged-in user's own session (AuthProvider),
+  /// never typed in by hand — the backend does not yet verify this
+  /// server-side, so the app must be careful not to let this be spoofed.
+  Future<Student> createStudent({
+    required String name,
+    required int schoolId,
+    required int parentId,
+  }) async {
+    final headers = await ApiClient.authHeaders();
+    final response = await http.post(
+      Uri.parse(ApiConstants.createStudent),
+      headers: headers,
+      body: jsonEncode({
+        'name': name,
+        'school_id': schoolId,
+        'parent_id': parentId,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final studentJson = data['student'] as Map<String, dynamic>;
+      return Student.fromJson(studentJson);
+    } else {
+      final data = jsonDecode(response.body);
+      throw Exception(data['detail'] ?? 'Failed to register student.');
+    }
+  }
 }

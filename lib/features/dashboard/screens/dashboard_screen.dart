@@ -96,15 +96,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    if (walletProvider.students.isEmpty) {
+if (walletProvider.students.isEmpty) {
       return Center(
-        child: Text(
-          'No children registered yet.',
-          style: AppTheme.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'No children registered yet.',
+              style: AppTheme.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+            ),
+            const SizedBox(height: AppTheme.spaceLg),
+            ElevatedButton.icon(
+              onPressed: () => context.push('/add-child'),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add a Child'),
+            ),
+          ],
         ),
       ).animate().fadeIn(duration: 400.ms);
     }
-
     return ListView.builder(
       padding: const EdgeInsets.all(AppTheme.marginMobile),
       itemCount: walletProvider.students.length,
