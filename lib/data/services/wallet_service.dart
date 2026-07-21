@@ -1,4 +1,4 @@
-// Fetches a parent's students and each student's wallet balance.
+// Fetches a parent's students, wallet balances, and wallet history.
 // Talks to the confirmed /students/* and /wallets/* endpoints.
 
 import 'dart:convert';
@@ -7,6 +7,7 @@ import '../../core/constants/api_constants.dart';
 import 'api_client.dart';
 import '../models/student.dart';
 import '../models/wallet_balance.dart';
+import '../models/wallet_history.dart';
 
 class WalletService {
   /// GET /students/parent/{parentId}
@@ -48,6 +49,26 @@ class WalletService {
       throw Exception('Wallet not found for this student.');
     } else {
       throw Exception('Failed to load wallet (${response.statusCode})');
+    }
+  }
+
+  /// GET /wallets/{studentId}/history
+  /// NOT double-prefixed — confirmed correct as written (unlike the
+  /// balance endpoint above).
+  Future<WalletHistory> getWalletHistory(int studentId, {int limit = 20}) async {
+    final headers = await ApiClient.authHeaders();
+    final response = await http.get(
+      Uri.parse(ApiConstants.walletHistory(studentId, limit: limit)),
+      headers: headers,
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return WalletHistory.fromJson(data);
+    } else if (response.statusCode == 404) {
+      throw Exception('No wallet found for this student.');
+    } else {
+      throw Exception('Failed to load wallet history (${response.statusCode})');
     }
   }
 
