@@ -1,6 +1,7 @@
 // Child Wallet Detail screen. Shows balance (animated count-up),
-// summary tiles, a Top Up button, and recent transaction history for
-// a single student. Reached by tapping a child's card on the Dashboard.
+// summary tiles, Top Up and Manage NFC Card buttons, and recent
+// transaction history for a single student. Reached by tapping a
+// child's card on the Dashboard.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -12,6 +13,7 @@ import '../../../data/models/student.dart';
 import '../../../data/models/wallet_history.dart';
 import '../../../data/services/wallet_service.dart';
 import 'top_up_screen.dart';
+import 'nfc_card_view_screen.dart';
 
 class ChildWalletDetailScreen extends StatefulWidget {
   final Student student;
@@ -179,6 +181,24 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
             label: const Text('Top Up'),
           ),
         ).animate().fadeIn(delay: 150.ms),
+
+        const SizedBox(height: AppTheme.spaceMd),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      NfcCardViewScreen(student: widget.student),
+                ),
+              );
+            },
+            icon: const Icon(Icons.contactless_rounded),
+            label: const Text('Manage NFC Card'),
+          ),
+        ).animate().fadeIn(delay: 175.ms),
 
         const SizedBox(height: AppTheme.spaceXl),
 

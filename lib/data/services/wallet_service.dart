@@ -1,5 +1,6 @@
-// Fetches a parent's students, wallet balances, and wallet history.
-// Talks to the confirmed /students/* and /wallets/* endpoints.
+// Fetches a parent's students, wallet balances, and wallet history,
+// and assigns NFC cards. Talks to the confirmed /students/* and
+// /wallets/* endpoints.
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -108,6 +109,31 @@ class WalletService {
     } else {
       final data = jsonDecode(response.body);
       throw Exception(data['detail'] ?? 'Failed to register student.');
+    }
+  }
+
+  /// PUT /students/{studentId}/assign-nfc
+  /// Links a physical NFC card's UID to a student.
+  ///
+  /// NOTE: like create_student, the backend declares tag_uid as a plain
+  /// function parameter, so FastAPI binds it as a QUERY parameter, not a
+  /// JSON body. Confirmed from app/routes/students.py on 21 July 2026.
+  /// The backend rejects a UID already assigned to a different student.
+  Future<void> assignNfc({
+    required int studentId,
+    required String tagUid,
+  }) async {
+    final headers = await ApiClient.authHeaders();
+    final uri = Uri.parse(ApiConstants.assignNfc(studentId)).replace(
+      queryParameters: {'tag_uid': tagUid},
+    );
+    final response = await http.put(uri, headers: headers);
+
+    if (response.statusCode == 200) {
+      return;
+    } else {
+      final data = jsonDecode(response.body);
+      throw Exception(data['detail']?.toString() ?? 'Failed to assign card.');
     }
   }
 }
