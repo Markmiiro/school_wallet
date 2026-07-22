@@ -7,6 +7,8 @@ import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/wallet/screens/add_child_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/change_pin_screen.dart';
+import '../../features/dashboard/screens/main_shell.dart';
+import '../../features/wallet/screens/buy_card_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -24,7 +26,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/dashboard',
-        builder: (context, state) => const DashboardScreen(),
+        builder: (context, state) => const MainShell(),
       ),
       GoRoute(
         path: '/add-child',
@@ -33,6 +35,9 @@ class AppRouter {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),GoRoute(
+        path: '/buy-card',
+        builder: (context, state) => const BuyCardScreen(),
       ),
       GoRoute(
         path: '/change-pin',

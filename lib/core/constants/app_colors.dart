@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 
+
 class AppColors {
   AppColors._(); // prevent instantiation
 
