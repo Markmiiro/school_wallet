@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../profile/screens/profile_screen.dart';
 import 'dashboard_screen.dart';
+import '../../wallet/screens/transactions_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -19,7 +20,7 @@ class _MainShellState extends State<MainShell> {
 
   final List<Widget> _tabs = const [
     DashboardScreen(),
-    _TransactionsPlaceholder(),
+    TransactionsScreen(),
     ProfileScreen(),
   ];
 
