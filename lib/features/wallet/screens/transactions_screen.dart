@@ -131,9 +131,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 child: Icon(icon, size: 16, color: color),
               ),
               const SizedBox(width: 8),
-              Text(label,
-                  style: AppTheme.bodySm
-                      .copyWith(color: AppColors.onSurfaceVariant)),
+              Flexible(
+                child: Text(label,
+                    style: AppTheme.bodySm
+                        .copyWith(color: AppColors.onSurfaceVariant),
+                    overflow: TextOverflow.ellipsis),
+              ),
             ],
           ),
           const SizedBox(height: AppTheme.spaceSm),
@@ -148,7 +151,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   Widget _txRow(FamilyTransaction ft) {
     final tx = ft.tx;
-    final isIn = tx.direction == 'IN';
+    // Use type as the source of truth; direction may include emoji arrows.
+    final isIn = tx.type == 'topup' || tx.direction.contains('IN');
     final amountFmt = NumberFormat('#,##0', 'en_US');
     final dateFmt = DateFormat('MMM d, h:mm a');
 
@@ -204,10 +208,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      dateFmt.format(tx.date),
-                      style: AppTheme.bodySm.copyWith(
-                          color: AppColors.onSurfaceVariant, fontSize: 11),
+                    Flexible(
+                      child: Text(
+                        dateFmt.format(tx.date),
+                        style: AppTheme.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -217,8 +224,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           const SizedBox(width: AppTheme.spaceSm),
           Text(
             '${isIn ? '+' : '-'}UGX ${amountFmt.format(tx.amount)}',
+            textAlign: TextAlign.right,
             style: AppTheme.bodyMd.copyWith(
               fontWeight: FontWeight.w700,
+              fontSize: 13,
               color: isIn ? AppColors.primary : AppColors.secondary,
             ),
           ),
