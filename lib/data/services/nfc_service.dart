@@ -1,22 +1,23 @@
-// Reads a physical NFC card's UID using nfc_manager 3.5.1.
-// Written against the confirmed installed API:
-//   - NfcManager.instance.isAvailable() -> Future<bool>
-//   - startSession({onDiscovered, pollingOptions})
-//   - platform tag classes (NfcA etc.) expose Uint8List identifier
+// Reads a physical NFC card's UID using nfc_manager 4.2.1.
+// Written against the confirmed installed v4 API:
+//   - NfcManager.instance.checkAvailability() -> Future<NfcAvailability>
+//   - startSession({pollingOptions, onDiscovered: void Function(NfcTag)})
+//   - NfcTagAndroid.from(tag).id -> Uint8List UID (works for any card type)
 //
-// The identifier bytes are converted to an uppercase hex string with
-// no separators — e.g. [0x04, 0xA2, 0x1B] -> "04A21B". This hex string
-// is what we send to the backend as tag_uid.
+// The id bytes are converted to an uppercase hex string with no
+// separators — e.g. [0x04, 0xA2, 0x1B] -> "04A21B". This hex string is
+// what we send to the backend as tag_uid.
 
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:nfc_manager/nfc_manager.dart';
-import 'package:nfc_manager/platform_tags.dart';
+import 'package:nfc_manager/nfc_manager_android.dart';
 
 class NfcService {
   /// Whether this device has NFC available and enabled.
-  Future<bool> isAvailable() {
-    return NfcManager.instance.isAvailable();
+  Future<bool> isAvailable() async {
+    final availability = await NfcManager.instance.checkAvailability();
+    return availability == NfcAvailability.enabled;
   }
 
   /// Starts an NFC session and waits for a single card tap, returning
@@ -24,9 +25,13 @@ class NfcService {
   Future<String> readCardUid({
     Duration timeout = const Duration(seconds: 30),
   }) async {
-    final available = await isAvailable();
-    if (!available) {
-      throw Exception('NFC is not available or is turned off on this device.');
+    final availability = await NfcManager.instance.checkAvailability();
+    if (availability != NfcAvailability.enabled) {
+      throw Exception(
+        availability == NfcAvailability.disabled
+            ? 'NFC is turned off. Please enable it in your phone settings.'
+            : 'NFC is not supported on this device.',
+      );
     }
 
     final completer = Completer<String>();
@@ -39,10 +44,10 @@ class NfcService {
       },
       onDiscovered: (NfcTag tag) async {
         try {
-          final uid = _extractUid(tag);
-          if (uid == null) {
+          final androidTag = NfcTagAndroid.from(tag);
+          if (androidTag == null || androidTag.id.isEmpty) {
             await NfcManager.instance.stopSession(
-              errorMessage: 'Could not read this card.',
+              errorMessageIos: 'Could not read this card.',
             );
             if (!completer.isCompleted) {
               completer.completeError(
@@ -51,10 +56,11 @@ class NfcService {
             }
             return;
           }
+          final uid = _toHex(androidTag.id);
           await NfcManager.instance.stopSession();
           if (!completer.isCompleted) completer.complete(uid);
         } catch (e) {
-          await NfcManager.instance.stopSession(errorMessage: 'Read failed.');
+          await NfcManager.instance.stopSession(errorMessageIos: 'Read failed.');
           if (!completer.isCompleted) completer.completeError(e);
         }
       },
@@ -78,21 +84,8 @@ class NfcService {
     }
   }
 
-  /// Tries each Android platform tag type in turn to find one that
-  /// exposes an identifier, then returns it as uppercase hex.
-  String? _extractUid(NfcTag tag) {
-    Uint8List? identifier;
-
-    identifier ??= NfcA.from(tag)?.identifier;
-    identifier ??= MifareClassic.from(tag)?.identifier;
-    identifier ??= MifareUltralight.from(tag)?.identifier;
-    identifier ??= IsoDep.from(tag)?.identifier;
-    identifier ??= NfcF.from(tag)?.identifier;
-    identifier ??= NfcV.from(tag)?.identifier;
-
-    if (identifier == null || identifier.isEmpty) return null;
-
-    return identifier
+  String _toHex(Uint8List bytes) {
+    return bytes
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join()
         .toUpperCase();
