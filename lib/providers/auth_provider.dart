@@ -3,11 +3,30 @@
 // calling AuthService directly.
 
 import 'package:flutter/material.dart';
+import '../data/services/api_client.dart';
 import '../data/services/auth_service.dart';
 import '../data/models/auth_user.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+
+  AuthProvider() {
+    // Any service that gets a 401 clears the stored session and calls
+    // this; the router listens to this provider and returns to /login.
+    ApiClient.onSessionExpired = _handleSessionExpired;
+  }
+
+  /// True from the moment a session expires until the login screen has
+  /// told the parent why they were sent back.
+  bool sessionExpired = false;
+
+  void _handleSessionExpired() {
+    if (!isLoggedIn && currentUser == null) return;
+    isLoggedIn = false;
+    currentUser = null;
+    sessionExpired = true;
+    notifyListeners();
+  }
 
   bool isLoading = false;
   bool isInitialized = false;

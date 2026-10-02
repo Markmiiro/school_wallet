@@ -1,10 +1,9 @@
-// ThemeData and text styles from the Stitch design system.
+// ThemeData and text styles for the Nuvora brand.
 // Fonts: Manrope (headlines/currency), Inter (body), JetBrains Mono (PINs/account numbers).
-// Uses google_fonts package.
-//
-// Source: school_wallet_uganda_design_system/DESIGN.md
+// Uses google_fonts package. Colours come from AppColors only.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_colors.dart';
 
@@ -128,17 +127,21 @@ class AppTheme {
       ),
 
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.onSurface,
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.onPrimary,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: headlineMd,
+        titleTextStyle: headlineMd.copyWith(color: AppColors.onPrimary),
+        systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
 
       elevatedButtonTheme: ElevatedButtonThemeData(
+        // Teal fill, navy label. Never white on teal — see app_colors.dart.
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.onPrimary,
+          backgroundColor: AppColors.secondaryContainer,
+          foregroundColor: AppColors.onSecondaryContainer,
           minimumSize: const Size.fromHeight(minTouchTarget),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusDefault),

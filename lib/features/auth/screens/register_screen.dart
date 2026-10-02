@@ -113,7 +113,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppTheme.spaceLg),
-              Text('Join School Wallet', style: AppTheme.headlineLgMobile)
+              Text('Join Nuvora', style: AppTheme.headlineLgMobile)
                   .animate()
                   .fadeIn(duration: 400.ms)
                   .slideY(begin: 0.2, end: 0),
@@ -200,7 +200,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
+                                    strokeWidth: 2, color: AppColors.onSurfaceVariant),
                               )
                             : const Text('Create Account'),
                       ),

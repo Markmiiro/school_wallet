@@ -31,6 +31,10 @@ class WalletProvider extends ChangeNotifier {
   List<Student> students = [];
   Map<int, WalletBalance> balances = {};
 
+  // Whose data is currently held. If a different parent logs in on the
+  // same device, everything below is dropped before anything is shown.
+  int? _parentId;
+
   // Merged family-transactions feed state.
   bool isHistoryLoading = false;
   String? historyError;
@@ -42,6 +46,14 @@ class WalletProvider extends ChangeNotifier {
   /// balance. A single wallet failing doesn't fail the whole screen —
   /// that student just won't have a balance entry.
   Future<void> loadForParent(int parentId) async {
+    if (_parentId != parentId) {
+      _parentId = parentId;
+      students = [];
+      balances = {};
+      familyTransactions = [];
+      totalIn = 0;
+      totalOut = 0;
+    }
     isLoading = true;
     errorMessage = null;
     notifyListeners();
@@ -73,28 +85,6 @@ class WalletProvider extends ChangeNotifier {
   }
 
   WalletBalance? balanceFor(int studentId) => balances[studentId];
-
-  Future<bool> createStudent({
-    required String name,
-    required int schoolId,
-    required int parentId,
-  }) async {
-    try {
-      await _walletService.createStudent(
-        name: name,
-        schoolId: schoolId,
-        parentId: parentId,
-      );
-      // Reload the full list so the new student (with its
-      // auto-created wallet) shows up immediately.
-      await loadForParent(parentId);
-      return true;
-    } catch (e) {
-      errorMessage = e.toString();
-      notifyListeners();
-      return false;
-    }
-  }
 
   /// Loads every child's wallet history and merges them into one
   /// newest-first family feed. Individual failures are skipped so one

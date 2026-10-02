@@ -7,11 +7,15 @@ class WalletBalance {
   final double balance;
   final bool isActive;
 
+  /// UGX the child may spend per day. Enforced by the backend at the till.
+  final int? dailyLimit;
+
   WalletBalance({
     required this.studentId,
     required this.walletId,
     required this.balance,
     required this.isActive,
+    this.dailyLimit,
   });
 
   factory WalletBalance.fromJson(int studentId, Map<String, dynamic> json) {
@@ -20,6 +24,7 @@ class WalletBalance {
       walletId: json['wallet_id'] as int,
       balance: (json['balance'] as num).toDouble(),
       isActive: json['is_active'] as bool,
+      dailyLimit: (json['daily_limit'] as num?)?.toInt(),
     );
   }
 }

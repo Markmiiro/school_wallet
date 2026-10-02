@@ -47,6 +47,7 @@ class TopUpService {
         if (note != null && note.isNotEmpty) 'note': note,
       }),
     );
+    await ApiClient.ensureAuthorized(response);
 
     final data = jsonDecode(response.body);
 
@@ -76,6 +77,7 @@ class TopUpService {
       Uri.parse(ApiConstants.topupStatus(referenceId)),
       headers: headers,
     );
+    await ApiClient.ensureAuthorized(response);
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;

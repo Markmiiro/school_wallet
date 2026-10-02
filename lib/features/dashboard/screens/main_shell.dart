@@ -1,5 +1,5 @@
 // Bottom-navigation shell wrapping the three main tabs:
-// Home (dashboard), Transactions (placeholder for now), and Profile.
+// Home (dashboard), Transactions, and Profile.
 
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
@@ -18,10 +18,14 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _index = 0;
 
-  final List<Widget> _tabs = const [
-    DashboardScreen(),
-    TransactionsScreen(),
-    ProfileScreen(),
+  static const int _transactionsTab = 1;
+
+  late final List<Widget> _tabs = [
+    DashboardScreen(
+      onOpenTransactions: () => setState(() => _index = _transactionsTab),
+    ),
+    const TransactionsScreen(),
+    const ProfileScreen(),
   ];
 
   @override
@@ -31,10 +35,23 @@ class _MainShellState extends State<MainShell> {
       body: IndexedStack(index: _index, children: _tabs),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
-          backgroundColor: AppColors.surfaceContainerLowest,
-          indicatorColor: AppColors.primaryContainer.withOpacity(0.15),
-          labelTextStyle: WidgetStateProperty.all(
-            AppTheme.bodySm.copyWith(fontWeight: FontWeight.w500),
+          backgroundColor: AppColors.navBar,
+          surfaceTintColor: Colors.transparent,
+          indicatorColor: AppColors.navBarIndicator,
+          iconTheme: WidgetStateProperty.resolveWith(
+            (states) => IconThemeData(
+              color: states.contains(WidgetState.selected)
+                  ? AppColors.navBarActive
+                  : AppColors.navBarInactive,
+            ),
+          ),
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => AppTheme.bodySm.copyWith(
+              fontWeight: FontWeight.w500,
+              color: states.contains(WidgetState.selected)
+                  ? AppColors.navBarActive
+                  : AppColors.navBarInactive,
+            ),
           ),
         ),
         child: NavigationBar(
@@ -55,32 +72,6 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.person_outline_rounded),
               selectedIcon: Icon(Icons.person_rounded),
               label: 'Profile',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TransactionsPlaceholder extends StatelessWidget {
-  const _TransactionsPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(title: const Text('Transactions')),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.receipt_long_outlined,
-                size: 48, color: AppColors.onSurfaceVariant),
-            const SizedBox(height: AppTheme.spaceMd),
-            Text(
-              'Transaction history coming soon.',
-              style: AppTheme.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
             ),
           ],
         ),

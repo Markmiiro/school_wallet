@@ -1,7 +1,11 @@
 // Premium Dashboard. Greeting header, a hero card that switches between
-// an onboarding empty-state (no children) and a total-family-balance
-// state (has children), a quick-actions row (Add Child / Buy a Card /
-// History), and refined child cards with animated balance count-up.
+// a waiting state (no children yet) and a total-family-balance state
+// (has children), a quick-actions row (Buy a Card / History), and child
+// cards showing school, account number and an animated balance count-up.
+//
+// Parents do not create children here. A child is registered by the
+// school (or by USSD) against the parent's phone number and then shows
+// up in this list; the parent links a card from the child's wallet.
 //
 // NOTE: "Buy a Card" is a first-class action. Per the approved USSD
 // spec, registering a child = buying their UGX 25,000 card. The full
@@ -15,12 +19,17 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/animated_balance_counter.dart';
+import '../../../data/models/student.dart';
+import '../../../data/models/wallet_balance.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
 import '../../wallet/screens/child_wallet_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  /// Switches the shell to the Transactions tab.
+  final VoidCallback? onOpenTransactions;
+
+  const DashboardScreen({super.key, this.onOpenTransactions});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -47,11 +56,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final parts = name.trim().split(RegExp(r'\s+'));
     if (parts.length == 1) return parts.first[0].toUpperCase();
     return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-
-  String _firstName(String? name) {
-    if (name == null || name.trim().isEmpty) return 'there';
-    return name.trim().split(RegExp(r'\s+')).first;
   }
 
   double get _totalBalance {
@@ -88,7 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Icon(Icons.account_balance_wallet_rounded,
                       color: AppColors.primary, size: 26),
                   const SizedBox(width: AppTheme.spaceSm),
-                  Text('School Wallet', style: AppTheme.headlineMd),
+                  Text('Nuvora', style: AppTheme.headlineMd),
                   const Spacer(),
                   CircleAvatar(
                     radius: 18,
@@ -120,7 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (hasChildren)
                 _totalBalanceCard(walletProvider)
               else
-                _onboardingCard(_firstName(user?.name)),
+                _onboardingCard(user?.phone),
 
               const SizedBox(height: AppTheme.spaceLg),
 
@@ -133,16 +137,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Row(
                 children: [
                   Text('Your Children', style: AppTheme.headlineMd),
-                  const Spacer(),
-                  if (hasChildren)
-                    GestureDetector(
-                      onTap: () => context.push('/add-child'),
-                      child: Text('+ Add Student',
-                          style: AppTheme.bodySm.copyWith(
-                            color: AppColors.secondary,
-                            fontWeight: FontWeight.w600,
-                          )),
-                    ),
                 ],
               ),
               const SizedBox(height: AppTheme.spaceMd),
@@ -173,7 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(AppTheme.spaceLg),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: AppColors.primaryContainer,
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         boxShadow: [AppColors.level2Shadow],
       ),
@@ -182,17 +176,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Positioned(
             right: 0, top: 0,
             child: Icon(Icons.shield_rounded,
-                color: Colors.white.withOpacity(0.15), size: 28),
+                color: AppColors.onPrimaryContainer.withOpacity(0.15), size: 28),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Total family balance',
-                  style: AppTheme.bodySm.copyWith(color: Colors.white70)),
+                  style: AppTheme.bodySm.copyWith(color: AppColors.onPrimaryContainerMuted)),
               const SizedBox(height: AppTheme.spaceXs),
               AnimatedBalanceCounter(
                 balance: _totalBalance,
-                style: AppTheme.displayCurrency.copyWith(color: Colors.white),
+                style: AppTheme.displayCurrency.copyWith(color: AppColors.onPrimaryContainer),
               ),
               const SizedBox(height: AppTheme.spaceMd),
               ElevatedButton(
@@ -202,10 +196,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   minimumSize: const Size(0, 40),
                 ),
                 onPressed: () {
-                  // Top up requires choosing a child; nudge to a child card.
+                  // A top-up is always for one child. With one child, go
+                  // straight to their wallet; otherwise ask which.
+                  if (wallet.students.length == 1) {
+                    _openChild(wallet.students.first);
+                    return;
+                  }
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Open a child to top up their wallet.'),
+                      content:
+                          Text('Choose a child below to top up their wallet.'),
                     ),
                   );
                 },
@@ -218,12 +218,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ).animate().fadeIn(delay: 120.ms).slideY(begin: 0.1, end: 0);
   }
 
-  Widget _onboardingCard(String firstName) {
+  Widget _onboardingCard(String? phone) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppTheme.spaceLg),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: AppColors.primaryContainer,
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         boxShadow: [AppColors.level2Shadow],
       ),
@@ -231,17 +231,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: Colors.white.withOpacity(0.15),
-            child: const Icon(Icons.person_add_alt_1_rounded,
-                color: Colors.white, size: 28),
+            backgroundColor: AppColors.onPrimaryContainer.withOpacity(0.15),
+            child: const Icon(Icons.school_rounded,
+                color: AppColors.onPrimaryContainer, size: 28),
           ),
           const SizedBox(height: AppTheme.spaceMd),
-          Text("Let's get started", style: AppTheme.headlineMd.copyWith(color: Colors.white)),
+          Text('No children linked yet', style: AppTheme.headlineMd.copyWith(color: AppColors.onPrimaryContainer)),
           const SizedBox(height: AppTheme.spaceXs),
           Text(
-            'Add your child to create their wallet and start managing school payments.',
+            'Your child appears here once the school has registered them '
+            'under your phone number${phone != null ? ' ($phone)' : ''}. '
+            'Ask the school office, then pull down to refresh.',
             textAlign: TextAlign.center,
-            style: AppTheme.bodySm.copyWith(color: Colors.white70),
+            style: AppTheme.bodySm.copyWith(color: AppColors.onPrimaryContainerMuted),
           ),
           const SizedBox(height: AppTheme.spaceMd),
           ElevatedButton(
@@ -249,8 +251,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               backgroundColor: AppColors.secondaryContainer,
               foregroundColor: AppColors.onSecondaryContainer,
             ),
-            onPressed: () => context.push('/add-child'),
-            child: const Text('Add Your Child'),
+            onPressed: _load,
+            child: const Text('Check again'),
           ),
         ],
       ),
@@ -260,20 +262,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _quickActions(bool hasChildren) {
     return Row(
       children: [
-        _actionTile(Icons.person_add_alt_1_rounded, 'Add Child', true,
-            () => context.push('/add-child')),
-        const SizedBox(width: AppTheme.spaceMd),
         _actionTile(Icons.credit_card_rounded, 'Buy a Card', true, () {
-          // First-class action. Routes to the card-preview showcase.
-          // Full paid register-a-card flow pending backend support.
           context.push('/buy-card');
         }),
         const SizedBox(width: AppTheme.spaceMd),
-        _actionTile(Icons.receipt_long_rounded, 'History', hasChildren, () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Transaction history coming soon.')),
-          );
-        }),
+        _actionTile(Icons.receipt_long_rounded, 'History', hasChildren,
+            () => widget.onOpenTransactions?.call()),
       ],
     ).animate().fadeIn(delay: 160.ms);
   }
@@ -325,25 +319,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           Icon(Icons.groups_rounded, size: 30, color: AppColors.outlineVariant),
           const SizedBox(height: AppTheme.spaceSm),
-          Text('No children added yet',
+          Text('No children linked yet',
               style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
         ],
       ),
     );
   }
 
-  Widget _childCard(dynamic student, dynamic balance, int index) {
+  Future<void> _openChild(Student student) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ChildWalletDetailScreen(student: student),
+      ),
+    );
+    // A top-up, a new limit or a blocked card may have happened in there.
+    if (mounted) _load();
+  }
+
+  Widget _childCard(Student student, WalletBalance? balance, int index) {
+    final schoolLine = [
+      if (student.schoolName != null) student.schoolName!,
+      if (student.accountNumber != null) 'Acc ${student.accountNumber}',
+    ].join(' · ');
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => ChildWalletDetailScreen(student: student),
-            ),
-          );
-        },
+        onTap: () => _openChild(student),
         child: Container(
           margin: const EdgeInsets.only(bottom: AppTheme.spaceMd),
           padding: const EdgeInsets.all(AppTheme.spaceLg),
@@ -366,6 +369,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(student.name, style: AppTheme.headlineMd.copyWith(fontSize: 17)),
+                    if (schoolLine.isNotEmpty)
+                      Text(
+                        schoolLine,
+                        style: AppTheme.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     const SizedBox(height: 2),
                     if (balance == null)
                       Text('Balance unavailable',

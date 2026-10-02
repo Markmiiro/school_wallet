@@ -115,6 +115,10 @@ class AuthService {
     final token = await ApiClient.getToken();
     final userJson = await ApiClient.getStoredUserJson();
     if (token == null || userJson == null) return null;
+    if (ApiClient.isTokenExpired(token)) {
+      await ApiClient.clearSession();
+      return null;
+    }
     return AuthUser.fromJson(jsonDecode(userJson));
   }
 

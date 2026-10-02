@@ -66,7 +66,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               child: _totalTile(
                 label: 'Total In',
                 value: wallet.totalIn,
-                color: AppColors.primary,
+                color: AppColors.moneyIn,
                 icon: Icons.arrow_downward_rounded,
               ),
             ),
@@ -75,7 +75,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               child: _totalTile(
                 label: 'Total Out',
                 value: wallet.totalOut,
-                color: AppColors.secondary,
+                color: AppColors.moneyOut,
                 icon: Icons.arrow_upward_rounded,
               ),
             ),
@@ -151,8 +151,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   Widget _txRow(FamilyTransaction ft) {
     final tx = ft.tx;
-    // Use type as the source of truth; direction may include emoji arrows.
-    final isIn = tx.type == 'topup' || tx.direction.contains('IN');
+    final isIn = tx.isIn;
+    // Only a completed transaction moved money. A pending or failed
+    // top-up must not read as "+UGX" in the feed.
+    final settled = tx.isCompleted;
+    final tone = !settled
+        ? AppColors.onSurfaceVariant
+        : (isIn ? AppColors.moneyIn : AppColors.moneyOut);
     final amountFmt = NumberFormat('#,##0', 'en_US');
     final dateFmt = DateFormat('MMM d, h:mm a');
 
@@ -168,12 +173,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor:
-                (isIn ? AppColors.primary : AppColors.secondary).withOpacity(0.12),
+            backgroundColor: tone.withOpacity(0.12),
             child: Icon(
-              isIn ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+              tx.isFailed
+                  ? Icons.close_rounded
+                  : tx.isPending
+                      ? Icons.schedule_rounded
+                      : isIn
+                          ? Icons.arrow_downward_rounded
+                          : Icons.arrow_upward_rounded,
               size: 18,
-              color: isIn ? AppColors.primary : AppColors.secondary,
+              color: tone,
             ),
           ),
           const SizedBox(width: AppTheme.spaceMd),
@@ -187,6 +197,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (!settled)
+                  Text(
+                    tx.isFailed ? 'Failed — no money moved' : 'Pending approval',
+                    style: AppTheme.bodySm.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: tx.isFailed
+                          ? AppColors.error
+                          : AppColors.onSurfaceVariant,
+                    ),
+                  ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -223,12 +244,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           ),
           const SizedBox(width: AppTheme.spaceSm),
           Text(
-            '${isIn ? '+' : '-'}UGX ${amountFmt.format(tx.amount)}',
+            '${settled ? (isIn ? '+' : '-') : ''}UGX ${amountFmt.format(tx.amount)}',
             textAlign: TextAlign.right,
             style: AppTheme.bodyMd.copyWith(
               fontWeight: FontWeight.w700,
               fontSize: 13,
-              color: isIn ? AppColors.primary : AppColors.secondary,
+              color: tone,
+              decoration: tx.isFailed ? TextDecoration.lineThrough : null,
             ),
           ),
         ],

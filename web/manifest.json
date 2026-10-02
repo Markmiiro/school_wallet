@@ -1,11 +1,11 @@
 {
-    "name": "School Wallet Uganda",
-    "short_name": "School Wallet",
+    "name": "Nuvora",
+    "short_name": "Nuvora",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#1A146B",
-    "theme_color": "#1A146B",
-    "description": "School Wallet Uganda: manage your children's school wallets, cards and transactions.",
+    "background_color": "#0D2551",
+    "theme_color": "#0D2551",
+    "description": "Nuvora: manage your children's school wallets, cards and transactions.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

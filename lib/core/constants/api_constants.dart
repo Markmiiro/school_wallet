@@ -15,7 +15,13 @@
 class ApiConstants {
   ApiConstants._();
 
-  static const String baseUrl = 'https://web-production-454a5.up.railway.app';
+  // Defaults to production. Point a build at another backend with
+  //   flutter run --dart-define=API_BASE_URL=http://localhost:8000
+  // so local work does not have to touch the live database.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://web-production-454a5.up.railway.app',
+  );
 
   // ── Auth ──────────────────────────────────────────────────
   static const String login = '$baseUrl/auth/login';
@@ -32,13 +38,16 @@ class ApiConstants {
   static String studentsBySchool(int schoolId) =>
       '$baseUrl/students/school/$schoolId';
 
-  static const String createStudent = '$baseUrl/students/';
-
   static String assignNfc(int studentId) =>
       '$baseUrl/students/$studentId/assign-nfc';
 
   static String deactivateStudent(int studentId) =>
       '$baseUrl/students/$studentId/deactivate';
+
+  // POST /students/{id}/report-stolen?reason=lost|stolen — open to the
+  // child's own parent. Blocks the card; the wallet is untouched.
+  static String reportCard(int studentId) =>
+      '$baseUrl/students/$studentId/report-stolen';
 
   // ── Wallets ───────────────────────────────────────────────
   // NOTE: double "/wallets/wallets/" is intentional — see file header.
@@ -48,6 +57,11 @@ class ApiConstants {
   // This one is NOT double-prefixed — confirmed correct as-is.
   static String walletHistory(int studentId, {int limit = 20}) =>
       '$baseUrl/wallets/$studentId/history?limit=$limit';
+
+  // PUT /wallets/{studentId}/limit?daily_limit=N — the child's own
+  // parent (or a school admin) sets the daily spending limit.
+  static String walletLimit(int studentId) =>
+      '$baseUrl/wallets/$studentId/limit';
 
   // ── Top-Up ────────────────────────────────────────────────
   // Confirmed from app/routes/topup.py on 21 July 2026.
@@ -66,6 +80,17 @@ class ApiConstants {
   // Not wired into the app yet, but confirmed available.
   static String topupHistory(int walletId, {int limit = 10}) =>
       '$baseUrl/topup/history/$walletId?limit=$limit';
+
+  // ── Card orders ───────────────────────────────────────────
+  // From app/routes/cards.py. POST /cards/orders takes a JSON body
+  // {student_id, card_color, phone_number, network}; the price is set
+  // by the server (UGX 25,000). Like a top-up, the response is always
+  // "pending" and the order is confirmed by polling.
+  static const String cardOrders = '$baseUrl/cards/orders';
+
+  // GET /cards/orders/{reference_id} — pending | paid | failed | fulfilled
+  static String cardOrderStatus(String referenceId) =>
+      '$baseUrl/cards/orders/$referenceId';
 
   // ── Schools ───────────────────────────────────────────────
   static const String schools = '$baseUrl/schools/';

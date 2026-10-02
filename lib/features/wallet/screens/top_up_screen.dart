@@ -275,7 +275,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.check_circle_rounded,
-                  color: AppColors.primary, size: 72)
+                  color: AppColors.success, size: 72)
               .animate()
               .scale(duration: 400.ms, curve: Curves.elasticOut),
           const SizedBox(height: AppTheme.spaceLg),

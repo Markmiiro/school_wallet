@@ -86,6 +86,7 @@ class ProfileScreen extends StatelessWidget {
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,
+                foregroundColor: AppColors.onError,
               ),
               onPressed: () async {
                 await authProvider.logout();

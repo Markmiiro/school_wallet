@@ -36,6 +36,13 @@ class _LoginScreenState extends State<LoginScreen>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
+
+    // If we were sent here because the session ran out, say so once.
+    final auth = context.read<AuthProvider>();
+    if (auth.sessionExpired) {
+      auth.sessionExpired = false;
+      _pinError = 'Your session has expired. Please log in again.';
+    }
   }
 
   @override
@@ -138,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen>
                   Icon(Icons.account_balance_wallet_rounded,
                       color: AppColors.primary, size: 28),
                   const SizedBox(width: AppTheme.spaceSm),
-                  Text('School Wallet', style: AppTheme.headlineMd),
+                  Text('Nuvora', style: AppTheme.headlineMd),
                 ],
               ).animate().fadeIn(duration: 400.ms),
 
@@ -276,7 +283,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: AppColors.onSurfaceVariant,
                                 ),
                               )
                             : const Text('Continue to Wallet'),
@@ -324,12 +331,10 @@ class _LoginScreenState extends State<LoginScreen>
                     Icon(Icons.verified_user_rounded,
                         color: AppColors.onSurfaceVariant, size: 28),
                     const SizedBox(height: AppTheme.spaceXs),
-                    Text('End-to-End Encrypted Data',
-                        style: AppTheme.bodySm),
                     Text(
-                      'Bank-grade security for your academic savings.',
-                      style: AppTheme.bodySm
-                          .copyWith(color: AppColors.onSurfaceVariant),
+                      'Encrypted in transit. Your PIN is never stored in '
+                      'readable form.',
+                      style: AppTheme.bodySm,
                       textAlign: TextAlign.center,
                     ),
                   ],

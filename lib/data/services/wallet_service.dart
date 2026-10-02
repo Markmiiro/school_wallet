@@ -1,5 +1,5 @@
 // Fetches a parent's students, wallet balances, and wallet history,
-// and assigns NFC cards. Talks to the confirmed /students/* and
+// links cards by number, sets daily limits and blocks lost cards. Talks to the confirmed /students/* and
 // /wallets/* endpoints.
 
 import 'dart:convert';
@@ -19,6 +19,7 @@ class WalletService {
       Uri.parse(ApiConstants.studentsForParent(parentId)),
       headers: headers,
     );
+    await ApiClient.ensureAuthorized(response);
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -42,6 +43,7 @@ class WalletService {
       Uri.parse(ApiConstants.walletBalance(studentId)),
       headers: headers,
     );
+    await ApiClient.ensureAuthorized(response);
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -62,6 +64,7 @@ class WalletService {
       Uri.parse(ApiConstants.walletHistory(studentId, limit: limit)),
       headers: headers,
     );
+    await ApiClient.ensureAuthorized(response);
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -73,52 +76,14 @@ class WalletService {
     }
   }
 
-  /// POST /students/
-  /// Registers a new child under the given parent. parentId should
-  /// always come from the logged-in user's own session (AuthProvider),
-  /// never typed in by hand — the backend does not yet verify this
-  /// server-side, so the app must be careful not to let this be spoofed.
+  /// PUT /students/{studentId}/assign-nfc?tag_uid={card number}
+  /// Links a card to a child who already exists, by the card's number
+  /// (its UID in hex). A parent may do this only for their own child and
+  /// only when the child has no working card; the backend rejects a
+  /// number that is already linked or retired.
   ///
-  /// NOTE: the backend's create_student route declares name/school_id/
-  /// parent_id as plain function parameters (no Pydantic body model),
-  /// which FastAPI binds as QUERY parameters, not JSON body fields.
-  /// Confirmed live on 21 July 2026 — sending these as a JSON body
-  /// produces a 422 "Field required" error for all three fields.
-  Future<Student> createStudent({
-    required String name,
-    required int schoolId,
-    required int parentId,
-  }) async {
-    final headers = await ApiClient.authHeaders();
-    final uri = Uri.parse(ApiConstants.createStudent).replace(
-      queryParameters: {
-        'name': name,
-        'school_id': schoolId.toString(),
-        'parent_id': parentId.toString(),
-      },
-    );
-    final response = await http.post(
-      uri,
-      headers: headers,
-    );
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final studentJson = data['student'] as Map<String, dynamic>;
-      return Student.fromJson(studentJson);
-    } else {
-      final data = jsonDecode(response.body);
-      throw Exception(data['detail'] ?? 'Failed to register student.');
-    }
-  }
-
-  /// PUT /students/{studentId}/assign-nfc
-  /// Links a physical NFC card's UID to a student.
-  ///
-  /// NOTE: like create_student, the backend declares tag_uid as a plain
-  /// function parameter, so FastAPI binds it as a QUERY parameter, not a
-  /// JSON body. Confirmed from app/routes/students.py on 21 July 2026.
-  /// The backend rejects a UID already assigned to a different student.
+  /// NOTE: the backend declares tag_uid as a plain function parameter,
+  /// so FastAPI binds it as a QUERY parameter, not a JSON body.
   Future<void> assignNfc({
     required int studentId,
     required String tagUid,
@@ -128,12 +93,64 @@ class WalletService {
       queryParameters: {'tag_uid': tagUid},
     );
     final response = await http.put(uri, headers: headers);
+    await ApiClient.ensureAuthorized(response);
 
     if (response.statusCode == 200) {
       return;
     } else {
       final data = jsonDecode(response.body);
-      throw Exception(data['detail']?.toString() ?? 'Failed to assign card.');
+      throw Exception(_detail(data, 'Could not link the card.'));
     }
+  }
+
+  /// PUT /wallets/{studentId}/limit?daily_limit=N
+  /// Sets how much the child may spend per day (UGX 500–5,000,000).
+  /// Returns the limit the backend stored.
+  Future<int> setDailyLimit({
+    required int studentId,
+    required int dailyLimit,
+  }) async {
+    final headers = await ApiClient.authHeaders();
+    final uri = Uri.parse(ApiConstants.walletLimit(studentId)).replace(
+      queryParameters: {'daily_limit': dailyLimit.toString()},
+    );
+    final response = await http.put(uri, headers: headers);
+    await ApiClient.ensureAuthorized(response);
+
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return (data['daily_limit'] as num).toInt();
+    }
+    throw Exception(_detail(data, 'Could not update the daily limit.'));
+  }
+
+  /// POST /students/{studentId}/report-stolen?reason=lost|stolen
+  /// Blocks the child's current card straight away. The wallet and its
+  /// balance are untouched; the school issues a replacement card.
+  Future<void> reportCard({
+    required int studentId,
+    required String reason,
+  }) async {
+    final headers = await ApiClient.authHeaders();
+    final uri = Uri.parse(ApiConstants.reportCard(studentId)).replace(
+      queryParameters: {'reason': reason},
+    );
+    final response = await http.post(uri, headers: headers);
+    await ApiClient.ensureAuthorized(response);
+
+    if (response.statusCode == 200) return;
+    throw Exception(
+      _detail(jsonDecode(response.body), 'Could not block the card.'),
+    );
+  }
+
+  /// FastAPI sends validation errors as a list under 'detail' and
+  /// simple errors as a string.
+  String _detail(dynamic data, String fallback) {
+    final detail = data is Map ? data['detail'] : null;
+    if (detail is List && detail.isNotEmpty) {
+      return detail.first['msg']?.toString() ?? fallback;
+    }
+    return detail?.toString() ?? fallback;
   }
 }
