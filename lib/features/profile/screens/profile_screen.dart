@@ -1,6 +1,7 @@
 // Profile screen. Shows the logged-in parent's details (from cached
 // AuthProvider state) and provides Lock, fingerprint/face unlock (where
-// the phone supports it), Change PIN, Log Out and Delete account.
+// the phone supports it), Change PIN, Support, Log Out and Delete account,
+// with the app version at the foot.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -10,6 +11,7 @@ import '../../../core/biometric/biometric.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/device_prefs.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/support_links.dart';
 import '../../../providers/app_lock.dart';
 import '../../../providers/auth_provider.dart';
 import '../../lock/lock_gate.dart';
@@ -99,6 +101,12 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: AppTheme.spaceMd),
 
+            SupportLinks(screen: 'Profile', account: user?.phone)
+                .animate()
+                .fadeIn(delay: 175.ms),
+
+            const SizedBox(height: AppTheme.spaceMd),
+
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,
@@ -122,6 +130,9 @@ class ProfileScreen extends StatelessWidget {
                 onPressed: () => context.push('/delete-account'),
                 child: const Text('Delete account'),
               ).animate().fadeIn(delay: 250.ms),
+
+            const SizedBox(height: AppTheme.spaceLg),
+            const AppVersionLine(),
           ],
         ),
       ),

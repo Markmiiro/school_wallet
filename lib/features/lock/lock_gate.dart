@@ -13,6 +13,7 @@ import '../../core/biometric/biometric.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/device_prefs.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/support_links.dart';
 import '../../providers/app_lock.dart';
 import '../../providers/auth_provider.dart';
 
@@ -130,7 +131,8 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final name = context.read<AuthProvider>().currentUser?.name;
+    final user = context.read<AuthProvider>().currentUser;
+    final name = user?.name;
     final pinTheme = PinTheme(
       width: 56,
       height: 56,
@@ -208,6 +210,10 @@ class _LockScreenState extends State<LockScreen> {
                   onPressed: () => context.read<AuthProvider>().logout(),
                   child: const Text('Not you? Sign out'),
                 ),
+                const SizedBox(height: AppTheme.spaceLg),
+                // Someone who cannot get in needs help more than anyone.
+                SupportLinks(
+                    screen: 'Lock screen', account: user?.phone, onDark: true),
               ],
             ),
           ),
