@@ -1,8 +1,8 @@
 // Child Wallet Detail screen. Shows balance (animated count-up) and the
 // daily spending limit, the child's account number and card status,
-// Top Up / change limit / link a card / report card lost actions, and recent
-// transaction history for a single student. Reached by tapping a
-// child's card on the Dashboard.
+// Top Up / Controls / report card lost actions, and this child's own
+// activity grouped by day (core/widgets/activity_feed.dart). Reached by
+// tapping a child's card on the Dashboard.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,11 +10,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/activity_feed.dart';
 import '../../../core/widgets/animated_balance_counter.dart';
 import '../../../data/models/student.dart';
 import '../../../data/models/wallet_history.dart';
 import '../../../data/services/api_client.dart';
 import '../../../data/services/wallet_service.dart';
+import '../../../providers/wallet_provider.dart';
 import 'controls_screen.dart';
 import 'top_up_screen.dart';
 
@@ -188,6 +190,12 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
 
     final history = _history!;
     final walletActive = history.isActive ?? true;
+    final firstName = widget.student.name.split(' ').first;
+    final items = [
+      for (final tx in history.transactions)
+        FamilyTransaction(
+            studentName: widget.student.name, studentId: widget.student.id, tx: tx),
+    ];
 
     return ListView(
       padding: const EdgeInsets.all(AppTheme.marginMobile),
@@ -302,30 +310,26 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
 
         const SizedBox(height: AppTheme.spaceXl),
 
-        Text('Recent Transactions', style: AppTheme.headlineMd)
+        Text('Activity', style: AppTheme.headlineMd)
             .animate()
             .fadeIn(delay: 200.ms),
-        const SizedBox(height: AppTheme.spaceMd),
+        const SizedBox(height: AppTheme.spaceSm),
 
-        if (history.transactions.isEmpty)
+        // This child's transactions only, grouped by day.
+        if (history.totalSpent == 0 && !hasSpent(items))
+          NothingSpentNote(name: firstName).animate().fadeIn(delay: 225.ms),
+        if (items.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceXl),
-            child: Center(
-              child: Text(
-                'No transactions yet.',
-                style: AppTheme.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
-              ),
+            padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceLg),
+            child: Text(
+              'Top-ups and tuck-shop purchases will show up here.',
+              style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant),
             ),
           )
         else
-          ...history.transactions.asMap().entries.map((entry) {
-            final index = entry.key;
-            final tx = entry.value;
-            return _transactionTile(tx)
-                .animate()
-                .fadeIn(delay: (250 + index * 60).ms)
-                .slideX(begin: 0.05, end: 0);
-          }),
+          ActivityFeed(items: items, showChild: false)
+              .animate()
+              .fadeIn(delay: 250.ms),
       ],
     );
   }
@@ -481,81 +485,6 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
           Text(
             'UGX ${_ugx.format(value)}',
             style: AppTheme.headlineMd.copyWith(color: color, fontSize: 18),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _transactionTile(Transaction tx) {
-    final isIn = tx.isIn;
-    // Only a completed transaction moved money. A pending or failed
-    // top-up must not read as "+UGX" in the list.
-    final settled = tx.isCompleted;
-    final tone = !settled
-        ? AppColors.onSurfaceVariant
-        : (isIn ? AppColors.moneyIn : AppColors.moneyOut);
-    final dateFormatter = DateFormat('MMM d, h:mm a');
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppTheme.spaceSm),
-      padding: const EdgeInsets.all(AppTheme.spaceMd),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        border: Border.all(color: AppColors.level1CardBorder),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: tone.withOpacity(0.12),
-            child: Icon(
-              tx.isFailed
-                  ? Icons.close_rounded
-                  : tx.isPending
-                      ? Icons.schedule_rounded
-                      : isIn
-                          ? Icons.arrow_downward_rounded
-                          : Icons.arrow_upward_rounded,
-              size: 18,
-              color: tone,
-            ),
-          ),
-          const SizedBox(width: AppTheme.spaceMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tx.description ?? (isIn ? 'Top-up' : 'Payment'),
-                  style: AppTheme.bodyMd,
-                ),
-                Text(
-                  dateFormatter.format(tx.date),
-                  style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-                ),
-                if (!settled)
-                  Text(
-                    tx.isFailed ? 'Failed — no money moved' : 'Pending approval',
-                    style: AppTheme.bodySm.copyWith(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: tx.isFailed
-                          ? AppColors.error
-                          : AppColors.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Text(
-            '${settled ? (isIn ? '+' : '-') : ''}UGX ${_ugx.format(tx.amount)}',
-            style: AppTheme.bodyMd.copyWith(
-              fontWeight: FontWeight.w700,
-              color: tone,
-              decoration: tx.isFailed ? TextDecoration.lineThrough : null,
-            ),
           ),
         ],
       ),

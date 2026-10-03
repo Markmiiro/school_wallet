@@ -23,6 +23,10 @@ class Transaction {
   final String status; // "pending" | "completed" | "failed"
   final String? reference;
   final String? description;
+
+  /// The tuck shop, for a purchase. Null for top-ups and on older
+  /// backend builds.
+  final String? merchant;
   final DateTime date;
 
   Transaction({
@@ -33,6 +37,7 @@ class Transaction {
     required this.status,
     this.reference,
     this.description,
+    this.merchant,
     required this.date,
   });
 
@@ -44,6 +49,37 @@ class Transaction {
   /// builds sent direction with emoji arrows.
   bool get isIn => type == 'topup' || direction.contains('IN');
 
+  /// A sale at the tuck shop.
+  bool get isPurchase => type == 'payment';
+
+  /// Taken while the till had no connection and sent later.
+  bool get isOffline => description?.startsWith('[OFFLINE]') ?? false;
+
+  /// What the row is called. A purchase is named after the tuck shop:
+  /// the till sends the same description ("Tuck shop purchase") for every
+  /// sale, so the description alone says nothing. Older backend builds
+  /// sent no merchant but did write "NFC payment at <shop>".
+  String get title {
+    if (isPurchase) {
+      if (merchant != null && merchant!.trim().isNotEmpty) return merchant!.trim();
+      final at = RegExp(r'^(?:NFC payment|Payment) at (.+)$')
+          .firstMatch(description ?? '');
+      return at?.group(1) ?? 'Tuck shop purchase';
+    }
+    if (type == 'topup') return 'Top-up';
+    return description ?? 'Card registration';
+  }
+
+  /// A second line for a top-up: the parent's own note, or how it was
+  /// paid. Null when the description only repeats "Top-up for <child>".
+  String? get note {
+    final d = description?.trim();
+    if (type != 'topup' || d == null || d.isEmpty) return null;
+    if (d.startsWith('USSD top-up')) return 'By USSD';
+    if (d.startsWith('Top-up for ')) return null;
+    return d;
+  }
+
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
       id: json['id'] as int,
@@ -53,6 +89,7 @@ class Transaction {
       status: json['status'] as String,
       reference: json['reference'] as String?,
       description: json['description'] as String?,
+      merchant: json['merchant'] as String?,
       date: parseBackendTime(json['date'] as String),
     );
   }

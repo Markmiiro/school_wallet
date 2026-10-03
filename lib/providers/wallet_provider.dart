@@ -42,6 +42,18 @@ class WalletProvider extends ChangeNotifier {
   double totalIn = 0;
   double totalOut = 0;
 
+  // The same totals per child, for the per-child filter.
+  Map<int, double> _inByStudent = {};
+  Map<int, double> _outByStudent = {};
+
+  /// Topped up, for the family or for one child.
+  double totalInFor(int? studentId) =>
+      studentId == null ? totalIn : (_inByStudent[studentId] ?? 0);
+
+  /// Spent, for the family or for one child.
+  double totalOutFor(int? studentId) =>
+      studentId == null ? totalOut : (_outByStudent[studentId] ?? 0);
+
   /// Loads all of a parent's children, then loads each child's wallet
   /// balance. A single wallet failing doesn't fail the whole screen —
   /// that student just won't have a balance entry.
@@ -53,6 +65,8 @@ class WalletProvider extends ChangeNotifier {
       familyTransactions = [];
       totalIn = 0;
       totalOut = 0;
+      _inByStudent = {};
+      _outByStudent = {};
     }
     isLoading = true;
     errorMessage = null;
@@ -117,6 +131,8 @@ class WalletProvider extends ChangeNotifier {
       final merged = <FamilyTransaction>[];
       double tIn = 0;
       double tOut = 0;
+      final inBy = <int, double>{};
+      final outBy = <int, double>{};
 
       for (final entry in results) {
         final student = entry.key;
@@ -124,6 +140,8 @@ class WalletProvider extends ChangeNotifier {
         if (history == null) continue;
         tIn += history.totalToppedUp;
         tOut += history.totalSpent;
+        inBy[student.id] = history.totalToppedUp;
+        outBy[student.id] = history.totalSpent;
         for (final tx in history.transactions) {
           merged.add(FamilyTransaction(
             studentName: student.name,
@@ -138,6 +156,8 @@ class WalletProvider extends ChangeNotifier {
       familyTransactions = merged;
       totalIn = tIn;
       totalOut = tOut;
+      _inByStudent = inBy;
+      _outByStudent = outBy;
       isHistoryLoading = false;
       notifyListeners();
     } catch (e) {

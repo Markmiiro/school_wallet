@@ -1,14 +1,14 @@
 // Family Transactions feed. Merges every child's wallet history into
-// one newest-first timeline, with a per-child chip on each row so you
-// can tell whose transaction it is. Animated in/out totals, staggered
-// slide-in rows, and a shimmer skeleton while loading.
+// one newest-first timeline, grouped by day, with a filter per child:
+// the parent's real question is what one child spent. Totals follow the
+// filter. Rows come from core/widgets/activity_feed.dart.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/activity_feed.dart';
 import '../../../core/widgets/animated_balance_counter.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
@@ -21,6 +21,9 @@ class TransactionsScreen extends StatefulWidget {
 }
 
 class _TransactionsScreenState extends State<TransactionsScreen> {
+  // Null shows the whole family.
+  int? _studentId;
+
   @override
   void initState() {
     super.initState();
@@ -56,27 +59,38 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       return _shimmerList();
     }
 
+    // A child who is no longer in the list falls back to the family.
+    final student = wallet.students.where((s) => s.id == _studentId).firstOrNull;
+    final studentId = student?.id;
+    final items = activityFor(wallet.familyTransactions, studentId);
+    final firstName = student?.name.split(' ').first;
+
     return ListView(
       padding: const EdgeInsets.all(AppTheme.marginMobile),
       children: [
+        if (wallet.students.length > 1) ...[
+          _childFilter(wallet, studentId),
+          const SizedBox(height: AppTheme.spaceMd),
+        ],
+
         // Totals row
         Row(
           children: [
             Expanded(
               child: _totalTile(
-                label: 'Total In',
-                value: wallet.totalIn,
+                label: 'Topped up',
+                value: wallet.totalInFor(studentId),
                 color: AppColors.moneyIn,
-                icon: Icons.arrow_downward_rounded,
+                icon: Icons.add_rounded,
               ),
             ),
             const SizedBox(width: AppTheme.spaceMd),
             Expanded(
               child: _totalTile(
-                label: 'Total Out',
-                value: wallet.totalOut,
+                label: 'Spent',
+                value: wallet.totalOutFor(studentId),
                 color: AppColors.moneyOut,
-                icon: Icons.arrow_upward_rounded,
+                icon: Icons.storefront_rounded,
               ),
             ),
           ],
@@ -84,23 +98,61 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
         const SizedBox(height: AppTheme.spaceLg),
 
-        Text('Recent Activity', style: AppTheme.headlineMd)
-            .animate()
-            .fadeIn(delay: 100.ms),
-        const SizedBox(height: AppTheme.spaceMd),
+        Text(
+          firstName == null ? 'Recent activity' : '$firstName\'s activity',
+          style: AppTheme.headlineMd,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ).animate().fadeIn(delay: 100.ms),
+        const SizedBox(height: AppTheme.spaceSm),
 
-        if (wallet.familyTransactions.isEmpty)
-          _emptyState()
-        else
-          ...wallet.familyTransactions.asMap().entries.map((entry) {
-            final index = entry.key;
-            final ft = entry.value;
-            return _txRow(ft)
-                .animate()
-                .fadeIn(delay: (index * 55).ms, duration: 350.ms)
-                .slideX(begin: 0.08, end: 0);
-          }),
+        if (items.isEmpty)
+          _emptyState(firstName)
+        else ...[
+          // Top-ups but no purchase yet: say so rather than leave the
+          // parent wondering whether purchases are missing.
+          if (firstName != null && !hasSpent(items) && wallet.totalOutFor(studentId) == 0)
+            NothingSpentNote(name: firstName),
+          ActivityFeed(items: items, showChild: studentId == null)
+              .animate()
+              .fadeIn(duration: 350.ms),
+        ],
       ],
+    );
+  }
+
+  // "All" and one chip per child, scrolling sideways when they do not fit.
+  Widget _childFilter(WalletProvider wallet, int? selected) {
+    Widget chip(String label, int? id) {
+      final on = selected == id;
+      return Padding(
+        padding: const EdgeInsets.only(right: AppTheme.spaceSm),
+        child: ChoiceChip(
+          label: Text(label),
+          selected: on,
+          showCheckmark: false,
+          onSelected: (_) => setState(() => _studentId = id),
+          selectedColor: AppColors.secondaryContainer,
+          backgroundColor: AppColors.surfaceContainerLowest,
+          side: BorderSide(
+            color: on ? AppColors.secondaryContainer : AppColors.level1CardBorder,
+          ),
+          labelStyle: AppTheme.bodySm.copyWith(
+            fontWeight: FontWeight.w600,
+            color: on ? AppColors.onSecondaryContainer : AppColors.onSurface,
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          chip('All', null),
+          for (final s in wallet.students) chip(s.name.split(' ').first, s.id),
+        ],
+      ),
     );
   }
 
@@ -140,117 +192,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             ],
           ),
           const SizedBox(height: AppTheme.spaceSm),
-          AnimatedBalanceCounter(
-            balance: value,
-            style: AppTheme.headlineMd.copyWith(color: color, fontSize: 18),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _txRow(FamilyTransaction ft) {
-    final tx = ft.tx;
-    final isIn = tx.isIn;
-    // Only a completed transaction moved money. A pending or failed
-    // top-up must not read as "+UGX" in the feed.
-    final settled = tx.isCompleted;
-    final tone = !settled
-        ? AppColors.onSurfaceVariant
-        : (isIn ? AppColors.moneyIn : AppColors.moneyOut);
-    final amountFmt = NumberFormat('#,##0', 'en_US');
-    final dateFmt = DateFormat('MMM d, h:mm a');
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppTheme.spaceSm),
-      padding: const EdgeInsets.all(AppTheme.spaceMd),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        border: Border.all(color: AppColors.level1CardBorder),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: tone.withOpacity(0.12),
-            child: Icon(
-              tx.isFailed
-                  ? Icons.close_rounded
-                  : tx.isPending
-                      ? Icons.schedule_rounded
-                      : isIn
-                          ? Icons.arrow_downward_rounded
-                          : Icons.arrow_upward_rounded,
-              size: 18,
-              color: tone,
-            ),
-          ),
-          const SizedBox(width: AppTheme.spaceMd),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tx.description ?? (isIn ? 'Top-up' : 'Payment'),
-                  style: AppTheme.bodyMd,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (!settled)
-                  Text(
-                    tx.isFailed ? 'Failed — no money moved' : 'Pending approval',
-                    style: AppTheme.bodySm.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: tx.isFailed
-                          ? AppColors.error
-                          : AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    // Per-child chip
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-                      ),
-                      child: Text(
-                        ft.studentName,
-                        style: AppTheme.bodySm.copyWith(
-                          color: AppColors.primary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        dateFmt.format(tx.date),
-                        style: AppTheme.bodySm.copyWith(
-                            color: AppColors.onSurfaceVariant, fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppTheme.spaceSm),
-          Text(
-            '${settled ? (isIn ? '+' : '-') : ''}UGX ${amountFmt.format(tx.amount)}',
-            textAlign: TextAlign.right,
-            style: AppTheme.bodyMd.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: tone,
-              decoration: tx.isFailed ? TextDecoration.lineThrough : null,
+          // Shrinks rather than wraps on a narrow phone.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedBalanceCounter(
+              balance: value,
+              style: AppTheme.headlineMd.copyWith(color: color, fontSize: 18),
             ),
           ),
         ],
@@ -258,7 +206,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     );
   }
 
-  Widget _emptyState() {
+  Widget _emptyState(String? firstName) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceXl * 1.5),
       child: Center(
@@ -270,12 +218,15 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 .fadeIn()
                 .moveY(begin: -4, end: 4, duration: 1600.ms),
             const SizedBox(height: AppTheme.spaceMd),
-            Text('No transactions yet',
+            Text(firstName == null ? 'No transactions yet' : '$firstName has no activity yet',
                 style: AppTheme.headlineMd
                     .copyWith(color: AppColors.onSurfaceVariant, fontSize: 16)),
             const SizedBox(height: AppTheme.spaceXs),
             Text(
-              'Top-ups and tuck-shop payments will show up here.',
+              firstName == null
+                  ? 'Top-ups and tuck-shop purchases will show up here.'
+                  : '$firstName has not spent anything yet. Purchases at the '
+                      'tuck shop will show up here.',
               textAlign: TextAlign.center,
               style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant),
             ),
