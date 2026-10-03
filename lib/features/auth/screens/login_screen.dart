@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/auth_provider.dart';
+import 'terms_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -89,19 +90,49 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _pinError = null);
 
     final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.login(phone, pin);
+    var success = await authProvider.login(phone, pin);
 
     if (!mounted) return;
+
+    // Right PIN, but the terms have changed (or were never accepted):
+    // show them, and log in again with the acceptance if they agree.
+    if (!success && authProvider.termsRequiredVersion != null) {
+      final accepted = await Navigator.of(context).push<String>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (routeContext) => TermsAcceptanceView(
+            isUpdate: true,
+            onAccept: (version) => Navigator.of(routeContext).pop(version),
+            onDecline: () => Navigator.of(routeContext).pop(),
+          ),
+        ),
+      );
+      if (!mounted) return;
+
+      if (accepted == null) {
+        _showPinError('You need to accept the terms to use Nuvora.');
+        return;
+      }
+
+      success =
+          await authProvider.login(phone, pin, acceptTermsVersion: accepted);
+      if (!mounted) return;
+    }
 
     if (success) {
       context.go('/dashboard');
     } else {
-      setState(() {
-        _pinError = authProvider.errorMessage ?? 'Login failed.';
-      });
+      _showPinError(authProvider.errorMessage ?? 'Login failed.');
       _triggerShake();
-      _pinController.clear();
     }
+  }
+
+  /// Clears the PIN boxes and shows [message] under them. The PIN is
+  /// cleared FIRST: clearing fires Pinput's onChanged, which wipes any
+  /// error already showing, so the other order shows nothing at all.
+  void _showPinError(String message) {
+    _pinController.clear();
+    setState(() => _pinError = message);
   }
 
   @override

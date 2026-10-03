@@ -56,12 +56,22 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String phone, String pin) async {
+  /// Set by a login that failed only because the current terms have
+  /// not been accepted; the login screen shows them and tries again.
+  String? termsRequiredVersion;
+
+  Future<bool> login(
+    String phone,
+    String pin, {
+    String? acceptTermsVersion,
+  }) async {
     isLoading = true;
     errorMessage = null;
+    termsRequiredVersion = null;
     notifyListeners();
 
-    final result = await _authService.login(phone, pin);
+    final result = await _authService.login(phone, pin,
+        acceptTermsVersion: acceptTermsVersion);
 
     if (result.success) {
       currentUser = result.user;
@@ -71,6 +81,7 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } else {
       errorMessage = result.errorMessage;
+      termsRequiredVersion = result.termsRequiredVersion;
       isLoggedIn = false;
       isLoading = false;
       notifyListeners();
@@ -86,6 +97,7 @@ class AuthProvider extends ChangeNotifier {
     required String name,
     required String phone,
     required String pin,
+    required String termsVersion,
   }) async {
     isLoading = true;
     errorMessage = null;
@@ -95,6 +107,7 @@ class AuthProvider extends ChangeNotifier {
       name: name,
       phone: phone,
       pin: pin,
+      termsVersion: termsVersion,
     );
 
     // If registration returned a session directly, we're done.

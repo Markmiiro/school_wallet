@@ -1,6 +1,10 @@
 // Registration screen — new parent creates an account with name,
 // phone, and a 4-digit PIN (entered twice to confirm). On success,
 // AuthProvider auto-logs them in and we navigate to the dashboard.
+//
+// The terms and privacy screen comes FIRST: the form is not shown, and
+// no account can be created, until the parent has accepted. The
+// accepted version is sent with the registration.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +15,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/auth_provider.dart';
+import 'terms_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -26,6 +31,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPinController = TextEditingController();
 
   String? _error;
+
+  /// The terms version accepted on the first step; null until then.
+  String? _acceptedTermsVersion;
 
   @override
   void dispose() {
@@ -74,6 +82,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       name: name,
       phone: phone,
       pin: pin,
+      termsVersion: _acceptedTermsVersion!,
     );
 
     if (!mounted) return;
@@ -87,6 +96,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_acceptedTermsVersion == null) {
+      return TermsAcceptanceView(
+        onAccept: (version) =>
+            setState(() => _acceptedTermsVersion = version),
+        onDecline: () => context.go('/login'),
+      );
+    }
+
     final authProvider = context.watch<AuthProvider>();
 
     final defaultPinTheme = PinTheme(

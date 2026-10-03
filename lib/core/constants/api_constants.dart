@@ -29,6 +29,12 @@ class ApiConstants {
   static const String me = '$baseUrl/auth/me';
   static const String changePin = '$baseUrl/auth/change-pin';
 
+  // GET /auth/terms — public. Current terms version, the summary for
+  // the acceptance screen, and the full Terms and Privacy Policy.
+  // Signup sends `terms_version`; login sends `accept_terms_version`
+  // when the backend answers 403 with code "terms_required".
+  static const String terms = '$baseUrl/auth/terms';
+
   // ── Students ──────────────────────────────────────────────
   static String studentsForParent(int parentId) =>
       '$baseUrl/students/parent/$parentId';

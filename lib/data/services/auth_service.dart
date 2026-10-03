@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../core/constants/api_constants.dart';
 import 'api_client.dart';
 import '../models/auth_user.dart';
+import '../models/terms.dart';
 
 class AuthResult {
   final bool success;
@@ -13,22 +14,84 @@ class AuthResult {
   final String? token;
   final AuthUser? user;
 
+  /// Set when the PIN was right but the backend will not issue a token
+  /// until this version of the terms is accepted.
+  final String? termsRequiredVersion;
+
   AuthResult({
     required this.success,
     this.errorMessage,
     this.token,
     this.user,
+    this.termsRequiredVersion,
   });
 }
 
 class AuthService {
-  Future<AuthResult> login(String phone, String pin) async {
+  /// GET /auth/terms — the text the parent is asked to accept, with the
+  /// version that acceptance will be recorded against.
+  Future<Terms> fetchTerms() async {
+    final response = await http
+        .get(Uri.parse(ApiConstants.terms), headers: ApiClient.baseHeaders())
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) {
+      throw Exception('Could not load the terms. Please try again.');
+    }
+    return Terms.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// Body for POST /auth/login. [acceptTermsVersion] is sent only when
+  /// the parent has just accepted that version on the terms screen.
+  static Map<String, dynamic> loginBody(
+    String phone,
+    String pin, {
+    String? acceptTermsVersion,
+  }) =>
+      {
+        'phone': phone,
+        'pin': pin,
+        'accept_terms_version': ?acceptTermsVersion,
+      };
+
+  /// Body for POST /auth/register. The backend creates no account
+  /// unless [termsVersion] is the current version.
+  static Map<String, dynamic> registerBody({
+    required String name,
+    required String phone,
+    required String pin,
+    required String termsVersion,
+    String role = 'parent',
+  }) =>
+      {
+        'name': name,
+        'phone': phone,
+        'pin': pin,
+        'role': role,
+        'terms_version': termsVersion,
+      };
+
+  /// The terms version the backend is asking the parent to accept, or
+  /// null if this login response is anything else (wrong PIN, lockout,
+  /// success).
+  static String? termsRequiredVersion(int statusCode, dynamic data) {
+    if (statusCode != 403 || data is! Map) return null;
+    if (data['code'] != 'terms_required') return null;
+    final version = data['terms_version'];
+    return version is String ? version : null;
+  }
+
+  Future<AuthResult> login(
+    String phone,
+    String pin, {
+    String? acceptTermsVersion,
+  }) async {
     try {
       final response = await http
           .post(
             Uri.parse(ApiConstants.login),
             headers: ApiClient.baseHeaders(),
-            body: jsonEncode({'phone': phone, 'pin': pin}),
+            body: jsonEncode(loginBody(phone, pin,
+                acceptTermsVersion: acceptTermsVersion)),
           )
           .timeout(const Duration(seconds: 15));
 
@@ -48,6 +111,8 @@ class AuthService {
         return AuthResult(
           success: false,
           errorMessage: data['detail'] ?? 'Login failed. Please try again.',
+          termsRequiredVersion:
+              termsRequiredVersion(response.statusCode, data),
         );
       }
     } catch (e) {
@@ -64,6 +129,7 @@ class AuthService {
     required String name,
     required String phone,
     required String pin,
+    required String termsVersion,
     String role = 'parent',
   }) async {
     try {
@@ -71,12 +137,13 @@ class AuthService {
           .post(
             Uri.parse(ApiConstants.register),
             headers: ApiClient.baseHeaders(),
-            body: jsonEncode({
-              'name': name,
-              'phone': phone,
-              'pin': pin,
-              'role': role,
-            }),
+            body: jsonEncode(registerBody(
+              name: name,
+              phone: phone,
+              pin: pin,
+              termsVersion: termsVersion,
+              role: role,
+            )),
           )
           .timeout(const Duration(seconds: 15));
 
