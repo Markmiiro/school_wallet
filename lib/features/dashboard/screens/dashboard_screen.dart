@@ -3,9 +3,10 @@
 // (has children), a quick-actions row (Buy a Card / History), and child
 // cards showing school, account number and an animated balance count-up.
 //
-// Parents do not create children here. A child is registered by the
-// school (or by USSD) against the parent's phone number and then shows
-// up in this list; the parent links a card from the child's wallet.
+// Parents do not create children here, and do not link cards. The school
+// registers each child with the guardian's phone number and links their
+// card at handout. When children wait on this parent's number, a banner
+// leads to ClaimChildrenScreen, which proves the number by SMS code once.
 //
 // NOTE: "Buy a Card" is a first-class action. Per the approved USSD
 // spec, registering a child = buying their UGX 25,000 card. The full
@@ -21,8 +22,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/animated_balance_counter.dart';
 import '../../../data/models/student.dart';
 import '../../../data/models/wallet_balance.dart';
+import '../../../data/services/family_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
+import '../../family/screens/claim_children_screen.dart';
 import '../../wallet/screens/child_wallet_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -36,6 +39,9 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final _family = FamilyService();
+  FamilyClaimable? _claimable;
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +55,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (parentId != null) {
       await walletProvider.loadForParent(parentId);
     }
+    try {
+      final claimable = await _family.claimable();
+      if (mounted) setState(() => _claimable = claimable);
+    } catch (_) {
+      // The banner is a convenience; the dashboard works without it.
+    }
+  }
+
+  Future<void> _openClaim() async {
+    final added = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => ClaimChildrenScreen(claimable: _claimable!),
+    ));
+    if (added == true) await _load();
   }
 
   String _initials(String? name) {
@@ -119,6 +138,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   .slideY(begin: 0.15, end: 0),
 
               const SizedBox(height: AppTheme.spaceLg),
+
+              if ((_claimable?.count ?? 0) > 0) ...[
+                _claimBanner(_claimable!.count),
+                const SizedBox(height: AppTheme.spaceLg),
+              ],
 
               // Hero card — switches on whether children exist
               if (hasChildren)
@@ -218,6 +242,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ).animate().fadeIn(delay: 120.ms).slideY(begin: 0.1, end: 0);
   }
 
+  Widget _claimBanner(int count) {
+    final noun = count == 1 ? 'child is' : 'children are';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppTheme.spaceLg),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(color: AppColors.secondaryContainer, width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$count $noun waiting for you', style: AppTheme.headlineMd),
+          const SizedBox(height: AppTheme.spaceXs),
+          Text('Your school registered them under your phone number.',
+              style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+          const SizedBox(height: AppTheme.spaceMd),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.secondaryContainer,
+              foregroundColor: AppColors.onSecondaryContainer,
+            ),
+            onPressed: _openClaim,
+            child: const Text('Add them'),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 300.ms);
+  }
+
   Widget _onboardingCard(String? phone) {
     return Container(
       width: double.infinity,
@@ -239,8 +294,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Text('No children linked yet', style: AppTheme.headlineMd.copyWith(color: AppColors.onPrimaryContainer)),
           const SizedBox(height: AppTheme.spaceXs),
           Text(
-            'Your child appears here once the school has registered them '
-            'under your phone number${phone != null ? ' ($phone)' : ''}. '
+            'Your child appears here once the school has added your phone '
+            'number${phone != null ? ' ($phone)' : ''} to their records. '
             'Ask the school office, then pull down to refresh.',
             textAlign: TextAlign.center,
             style: AppTheme.bodySm.copyWith(color: AppColors.onPrimaryContainerMuted),

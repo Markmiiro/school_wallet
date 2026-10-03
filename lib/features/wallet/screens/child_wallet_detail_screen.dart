@@ -16,7 +16,6 @@ import '../../../data/models/wallet_history.dart';
 import '../../../data/services/api_client.dart';
 import '../../../data/services/wallet_service.dart';
 import 'top_up_screen.dart';
-import 'link_card_screen.dart';
 
 class ChildWalletDetailScreen extends StatefulWidget {
   final Student student;
@@ -496,27 +495,17 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
               ),
             )
           else
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  final linked = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          LinkCardScreen(student: widget.student),
-                    ),
-                  );
-                  if (linked == true && mounted) {
-                    setState(() => _cardStatus = 'assigned');
-                  }
-                },
-                icon: const Icon(Icons.add_card_rounded),
-                label: Text(
-                  (_cardStatus == 'lost' || _cardStatus == 'stolen')
-                      ? 'Link a replacement card'
-                      : 'Link a card',
-                ),
-              ),
+            // Cards are linked by the school when it hands them over: a
+            // card number proves nothing about who types it.
+            Text(
+              (_cardStatus == 'lost' || _cardStatus == 'stolen')
+                  ? 'Buy a replacement card, or ask the school for one. The '
+                      'school links it when they hand it over, and the balance '
+                      'moves to it.'
+                  : 'No card linked yet. The school links your child\'s card '
+                      'when they hand it over. Ask the school office if it is '
+                      'taking long.',
+              style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant),
             ),
         ],
       ),

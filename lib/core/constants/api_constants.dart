@@ -35,6 +35,13 @@ class ApiConstants {
   // when the backend answers 403 with code "terms_required".
   static const String terms = '$baseUrl/auth/terms';
 
+  // ── Family (children from the school's roster) ────────────
+  // From app/routes/family.py. Cards are linked by the school, never by
+  // number in the app: a card number is printed on the card.
+  static const String familyClaimable = '$baseUrl/family/claimable';
+  static const String familySendCode = '$baseUrl/family/send-code';
+  static const String familyClaim = '$baseUrl/family/claim';
+
   // ── Account deletion ──────────────────────────────────────
   // From app/routes/account.py. Preview first, then POST
   // {pin, confirm: "DELETE"}; the answer is 202 and every session ends.
@@ -50,9 +57,6 @@ class ApiConstants {
 
   static String studentsBySchool(int schoolId) =>
       '$baseUrl/students/school/$schoolId';
-
-  static String assignNfc(int studentId) =>
-      '$baseUrl/students/$studentId/assign-nfc';
 
   static String deactivateStudent(int studentId) =>
       '$baseUrl/students/$studentId/deactivate';

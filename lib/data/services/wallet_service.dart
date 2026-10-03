@@ -77,32 +77,6 @@ class WalletService {
   }
 
   /// PUT /students/{studentId}/assign-nfc?tag_uid={card number}
-  /// Links a card to a child who already exists, by the card's number
-  /// (its UID in hex). A parent may do this only for their own child and
-  /// only when the child has no working card; the backend rejects a
-  /// number that is already linked or retired.
-  ///
-  /// NOTE: the backend declares tag_uid as a plain function parameter,
-  /// so FastAPI binds it as a QUERY parameter, not a JSON body.
-  Future<void> assignNfc({
-    required int studentId,
-    required String tagUid,
-  }) async {
-    final headers = await ApiClient.authHeaders();
-    final uri = Uri.parse(ApiConstants.assignNfc(studentId)).replace(
-      queryParameters: {'tag_uid': tagUid},
-    );
-    final response = await http.put(uri, headers: headers);
-    await ApiClient.ensureAuthorized(response);
-
-    if (response.statusCode == 200) {
-      return;
-    } else {
-      final data = jsonDecode(response.body);
-      throw Exception(_detail(data, 'Could not link the card.'));
-    }
-  }
-
   /// PUT /wallets/{studentId}/limit?daily_limit=N
   /// Sets how much the child may spend per day (UGX 500–5,000,000).
   /// Returns the limit the backend stored.
