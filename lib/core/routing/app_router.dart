@@ -9,6 +9,7 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/change_pin_screen.dart';
+import '../../features/profile/screens/delete_account_screen.dart';
 import '../../features/dashboard/screens/main_shell.dart';
 import '../../features/wallet/screens/buy_card_screen.dart';
 import '../../providers/auth_provider.dart';
@@ -52,6 +53,10 @@ class AppRouter {
         GoRoute(
           path: '/change-pin',
           builder: (context, state) => const ChangePinScreen(),
+        ),
+        GoRoute(
+          path: '/delete-account',
+          builder: (context, state) => const DeleteAccountScreen(),
         ),
       ],
     );

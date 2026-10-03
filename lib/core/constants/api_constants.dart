@@ -35,6 +35,13 @@ class ApiConstants {
   // when the backend answers 403 with code "terms_required".
   static const String terms = '$baseUrl/auth/terms';
 
+  // ── Account deletion ──────────────────────────────────────
+  // From app/routes/account.py. Preview first, then POST
+  // {pin, confirm: "DELETE"}; the answer is 202 and every session ends.
+  // The web page for people without the app is $baseUrl/account/delete.
+  static const String closurePreview = '$baseUrl/account/closure/preview';
+  static const String closure = '$baseUrl/account/closure';
+
   // ── Students ──────────────────────────────────────────────
   static String studentsForParent(int parentId) =>
       '$baseUrl/students/parent/$parentId';

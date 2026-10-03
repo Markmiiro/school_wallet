@@ -1,5 +1,5 @@
 // Profile screen. Shows the logged-in parent's details (from cached
-// AuthProvider state) and provides Change PIN and Log Out actions.
+// AuthProvider state) and provides Change PIN, Log Out and Delete account.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -95,6 +95,17 @@ class ProfileScreen extends StatelessWidget {
               icon: const Icon(Icons.logout_rounded),
               label: const Text('Log Out'),
             ).animate().fadeIn(delay: 200.ms),
+
+            const SizedBox(height: AppTheme.spaceXl),
+
+            // Kept apart from Log Out and plain, so it is not hit by
+            // mistake; the screen behind it asks for the PIN and DELETE.
+            if (user?.role == 'parent')
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                onPressed: () => context.push('/delete-account'),
+                child: const Text('Delete account'),
+              ).animate().fadeIn(delay: 250.ms),
           ],
         ),
       ),
