@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../core/constants/api_constants.dart';
 import 'api_client.dart';
+import '../models/spending_controls.dart';
 import '../models/student.dart';
 import '../models/wallet_balance.dart';
 import '../models/wallet_history.dart';
@@ -80,15 +81,37 @@ class WalletService {
   /// PUT /wallets/{studentId}/limit?daily_limit=N
   /// Sets how much the child may spend per day (UGX 500–5,000,000).
   /// Returns the limit the backend stored.
+  static Map<String, dynamic> limitBody({
+    required int dailyLimit,
+    required String pin,
+  }) =>
+      {'daily_limit': dailyLimit, 'pin': pin};
+
+  /// GET /wallets/{studentId}/controls — limit, today's spend, card state
+  /// and the history of changes.
+  Future<SpendingControls> getControls(int studentId) async {
+    final response = await http.get(Uri.parse(ApiConstants.walletControls(studentId)),
+        headers: await ApiClient.authHeaders());
+    await ApiClient.ensureAuthorized(response);
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return SpendingControls.fromJson(data as Map<String, dynamic>);
+    }
+    throw Exception(_detail(data, 'Could not load the controls.'));
+  }
+
+  /// PUT /wallets/{studentId}/limit {daily_limit, pin}. A wrong PIN is
+  /// 400 with the server's message; only 401 means the session ended.
   Future<int> setDailyLimit({
     required int studentId,
     required int dailyLimit,
+    required String pin,
   }) async {
-    final headers = await ApiClient.authHeaders();
-    final uri = Uri.parse(ApiConstants.walletLimit(studentId)).replace(
-      queryParameters: {'daily_limit': dailyLimit.toString()},
+    final response = await http.put(
+      Uri.parse(ApiConstants.walletLimit(studentId)),
+      headers: await ApiClient.authHeaders(),
+      body: jsonEncode(limitBody(dailyLimit: dailyLimit, pin: pin)),
     );
-    final response = await http.put(uri, headers: headers);
     await ApiClient.ensureAuthorized(response);
 
     final data = jsonDecode(response.body);
@@ -96,6 +119,26 @@ class WalletService {
       return (data['daily_limit'] as num).toInt();
     }
     throw Exception(_detail(data, 'Could not update the daily limit.'));
+  }
+
+  /// POST /students/{studentId}/card/block or /unblock {pin}. Pauses or
+  /// resumes the card; unlike lost/stolen, a blocked card can come back.
+  Future<void> setCardBlocked({
+    required int studentId,
+    required bool blocked,
+    required String pin,
+  }) async {
+    final response = await http.post(
+      Uri.parse(blocked
+          ? ApiConstants.blockCard(studentId)
+          : ApiConstants.unblockCard(studentId)),
+      headers: await ApiClient.authHeaders(),
+      body: jsonEncode({'pin': pin}),
+    );
+    await ApiClient.ensureAuthorized(response);
+    if (response.statusCode == 200) return;
+    throw Exception(_detail(jsonDecode(response.body),
+        blocked ? 'Could not block the card.' : 'Could not unblock the card.'));
   }
 
   /// POST /students/{studentId}/report-stolen?reason=lost|stolen

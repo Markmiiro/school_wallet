@@ -238,6 +238,32 @@ class AuthService {
     }
   }
 
+  /// POST /auth/unlock — the lock screen's PIN check. Returns null when
+  /// the PIN is right, or the message to show. A wrong PIN is 400 (not
+  /// 401), so only a session that has really ended signs the parent out.
+  Future<String?> unlock(String pin) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(ApiConstants.unlock),
+            headers: await ApiClient.authHeaders(),
+            body: jsonEncode({'pin': pin}),
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) return null;
+      if (response.statusCode == 401) {
+        await ApiClient.ensureAuthorized(response);
+      }
+      final detail = jsonDecode(response.body)['detail'];
+      return detail?.toString() ?? 'Could not check your PIN.';
+    } on SessionExpiredException {
+      return 'Your session has ended. Please log in again.';
+    } catch (_) {
+      return 'Could not reach the server to check your PIN. '
+          'Check your connection and try again.';
+    }
+  }
+
   Future<void> logout() async {
     await ApiClient.clearSession();
   }

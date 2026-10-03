@@ -1,13 +1,18 @@
 // Profile screen. Shows the logged-in parent's details (from cached
-// AuthProvider state) and provides Change PIN, Log Out and Delete account.
+// AuthProvider state) and provides Lock, fingerprint/face unlock (where
+// the phone supports it), Change PIN, Log Out and Delete account.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../../core/biometric/biometric.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/device_prefs.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../providers/app_lock.dart';
 import '../../../providers/auth_provider.dart';
+import '../../lock/lock_gate.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -75,6 +80,17 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: AppTheme.spaceXl),
 
+            // Locks without signing out; the PIN brings the parent back here.
+            OutlinedButton.icon(
+              onPressed: () => context.read<AppLock>().lock(),
+              icon: const Icon(Icons.lock_rounded),
+              label: const Text('Lock app'),
+            ).animate().fadeIn(delay: 120.ms),
+
+            if (user != null) _BiometricSetting(userId: user.id, name: user.name),
+
+            const SizedBox(height: AppTheme.spaceMd),
+
             OutlinedButton.icon(
               onPressed: () => context.push('/change-pin'),
               icon: const Icon(Icons.lock_reset_rounded),
@@ -121,6 +137,75 @@ class ProfileScreen extends StatelessWidget {
         const Spacer(),
         Text(value, style: AppTheme.bodyMd.copyWith(fontWeight: FontWeight.w600)),
       ],
+    );
+  }
+}
+
+/// "Unlock with fingerprint or face". Shown only where the phone has a
+/// sensor the browser can use; most cheap Android does not, and there the
+/// lock screen simply asks for the PIN.
+class _BiometricSetting extends StatefulWidget {
+  final int userId;
+  final String name;
+
+  const _BiometricSetting({required this.userId, required this.name});
+
+  @override
+  State<_BiometricSetting> createState() => _BiometricSettingState();
+}
+
+class _BiometricSettingState extends State<_BiometricSetting> {
+  final _prefs = SecureDevicePrefs();
+  bool _available = false;
+  bool _on = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final available = await Biometric.available();
+    final id = await _prefs.read(biometricKey(widget.userId));
+    if (!mounted) return;
+    setState(() {
+      _available = available;
+      _on = id != null;
+    });
+  }
+
+  Future<void> _toggle(bool on) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    if (on) {
+      final id = await Biometric.enroll('Nuvora ${widget.userId}', widget.name);
+      if (id == null) {
+        messenger.showSnackBar(const SnackBar(
+            content: Text('Could not set up fingerprint or face unlock.')));
+      } else {
+        await _prefs.write(biometricKey(widget.userId), id);
+      }
+    } else {
+      await _prefs.write(biometricKey(widget.userId), null);
+    }
+    await _check();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_available) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: AppTheme.spaceSm),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Unlock with fingerprint or face'),
+        subtitle: const Text('Checked on this phone only. Your PIN still works.'),
+        value: _on,
+        onChanged: _busy ? null : _toggle,
+      ),
     );
   }
 }

@@ -42,6 +42,63 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!--
+    Optional fingerprint / face unlock for the app lock (WebAuthn, platform
+    authenticator only). Used from lib/core/biometric/biometric_web.dart.
+
+    This is a check on THIS device: the phone's own sensor confirms the
+    person, and nothing is sent to the server. It guards the lock screen
+    the same way the lock screen itself does; it is not a sign-in. Where
+    the phone has no such sensor (most cheap Android), available() is
+    false and the app offers only the PIN.
+  -->
+  <script>
+    (function () {
+      function b64(buf) {
+        return btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+      }
+      function unb64(s) {
+        return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); });
+      }
+      function random(n) { return crypto.getRandomValues(new Uint8Array(n)); }
+
+      window.nuvoraBiometric = {
+        available: async function () {
+          try {
+            return !!(window.isSecureContext && window.PublicKeyCredential &&
+              await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+          } catch (e) { return false; }
+        },
+        // Returns the new credential's id (base64), or "" if refused.
+        enroll: async function (name, displayName) {
+          try {
+            var cred = await navigator.credentials.create({ publicKey: {
+              rp: { name: 'Nuvora' },
+              user: { id: random(16), name: name, displayName: displayName },
+              challenge: random(32),
+              pubKeyCredParams: [{ type: 'public-key', alg: -7 },
+                                 { type: 'public-key', alg: -257 }],
+              authenticatorSelection: { authenticatorAttachment: 'platform',
+                                        userVerification: 'required',
+                                        residentKey: 'discouraged' },
+              attestation: 'none', timeout: 60000 } });
+            return cred ? b64(cred.rawId) : '';
+          } catch (e) { return ''; }
+        },
+        // True only if the device confirmed the user (UP and UV flags).
+        verify: async function (id) {
+          try {
+            var a = await navigator.credentials.get({ publicKey: {
+              challenge: random(32),
+              allowCredentials: [{ type: 'public-key', id: unb64(id) }],
+              userVerification: 'required', timeout: 60000 } });
+            var flags = new Uint8Array(a.response.authenticatorData)[32];
+            return (flags & 0x05) === 0x05;
+          } catch (e) { return false; }
+        }
+      };
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

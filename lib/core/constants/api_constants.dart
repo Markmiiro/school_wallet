@@ -29,6 +29,10 @@ class ApiConstants {
   static const String me = '$baseUrl/auth/me';
   static const String changePin = '$baseUrl/auth/change-pin';
 
+  // POST /auth/unlock {pin} — the app lock's PIN check. Wrong PIN is 400,
+  // lockout 429; only 401 means the session itself has ended.
+  static const String unlock = '$baseUrl/auth/unlock';
+
   // GET /auth/terms — public. Current terms version, the summary for
   // the acceptance screen, and the full Terms and Privacy Policy.
   // Signup sends `terms_version`; login sends `accept_terms_version`
@@ -75,10 +79,23 @@ class ApiConstants {
   static String walletHistory(int studentId, {int limit = 20}) =>
       '$baseUrl/wallets/$studentId/history?limit=$limit';
 
-  // PUT /wallets/{studentId}/limit?daily_limit=N — the child's own
-  // parent (or a school admin) sets the daily spending limit.
+  // PUT /wallets/{studentId}/limit {daily_limit, pin} — the child's own
+  // parent (or a school admin) sets the daily spending limit. Needs the
+  // PIN; every change is audited.
   static String walletLimit(int studentId) =>
       '$baseUrl/wallets/$studentId/limit';
+
+  // GET /wallets/{studentId}/controls — limit, today's spend, card state,
+  // history of changes.
+  static String walletControls(int studentId) =>
+      '$baseUrl/wallets/$studentId/controls';
+
+  // POST {pin} — pause / resume the child's card. Unlike reportCard, a
+  // blocked card can be unblocked.
+  static String blockCard(int studentId) =>
+      '$baseUrl/students/$studentId/card/block';
+  static String unblockCard(int studentId) =>
+      '$baseUrl/students/$studentId/card/unblock';
 
   // ── Top-Up ────────────────────────────────────────────────
   // Confirmed from app/routes/topup.py on 21 July 2026.

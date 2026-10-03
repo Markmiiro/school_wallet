@@ -15,6 +15,7 @@ import '../../../data/models/student.dart';
 import '../../../data/models/wallet_history.dart';
 import '../../../data/services/api_client.dart';
 import '../../../data/services/wallet_service.dart';
+import 'controls_screen.dart';
 import 'top_up_screen.dart';
 
 class ChildWalletDetailScreen extends StatefulWidget {
@@ -29,8 +30,6 @@ class ChildWalletDetailScreen extends StatefulWidget {
 
 class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
   // Limits the backend accepts on PUT /wallets/{id}/limit.
-  static const int _minDailyLimit = 500;
-  static const int _maxDailyLimit = 5000000;
 
   final WalletService _walletService = WalletService();
   final NumberFormat _ugx = NumberFormat('#,##0', 'en_US');
@@ -39,8 +38,9 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
   String? _error;
   WalletHistory? _history;
 
-  // Starts from what the dashboard loaded; updated here when the parent
-  // blocks the card, so the screen does not show a stale "active".
+  // Starts from what the dashboard loaded, then follows the server on
+  // every load: the card may have been blocked or unblocked in Controls,
+  // and the dashboard's copy does not hear of it.
   late String? _cardStatus = widget.student.cardStatus;
 
   @override
@@ -57,9 +57,11 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
 
     try {
       final history = await _walletService.getWalletHistory(widget.student.id);
+      final cardStatus = await _currentCardStatus();
       if (!mounted) return;
       setState(() {
         _history = history;
+        _cardStatus = cardStatus ?? _cardStatus;
         _isLoading = false;
       });
     } on SessionExpiredException {
@@ -78,78 +80,23 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _editDailyLimit(int? current) async {
-    final controller = TextEditingController(text: current?.toString() ?? '');
-    String? fieldError;
-
-    final newLimit = await showDialog<int>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Daily spending limit'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'The most ${widget.student.name} can spend at the tuck shop '
-                'in one day. Payments above it are refused.',
-                style: AppTheme.bodySm,
-              ),
-              const SizedBox(height: AppTheme.spaceMd),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  prefixText: 'UGX ',
-                  errorText: fieldError,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final value = int.tryParse(controller.text.trim());
-                if (value == null ||
-                    value < _minDailyLimit ||
-                    value > _maxDailyLimit) {
-                  setDialogState(() => fieldError =
-                      'Enter an amount from UGX ${_ugx.format(_minDailyLimit)} '
-                      'to ${_ugx.format(_maxDailyLimit)}.');
-                  return;
-                }
-                Navigator.of(dialogContext).pop(value);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (newLimit == null || newLimit == current || !mounted) return;
-
+  // Null if it could not be read; the screen keeps what it had.
+  Future<String?> _currentCardStatus() async {
     try {
-      await _walletService.setDailyLimit(
-        studentId: widget.student.id,
-        dailyLimit: newLimit,
-      );
-      if (!mounted) return;
-      _showMessage('Daily limit set to UGX ${_ugx.format(newLimit)}.');
-      _load();
+      final controls = await _walletService.getControls(widget.student.id);
+      return controls.card.studentStatus;
     } on SessionExpiredException {
-      // Router handles it.
-    } catch (e) {
-      if (!mounted) return;
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      rethrow;
+    } catch (_) {
+      return null;
     }
+  }
+
+  Future<void> _openControls() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ControlsScreen(student: widget.student),
+    ));
+    if (mounted) _load(); // the limit or card may have changed
   }
 
   Future<void> _reportCard() async {
@@ -283,9 +230,9 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => _editDailyLimit(history.dailyLimit),
+                      onPressed: _openControls,
                       child: Text(
-                        'Change',
+                        'Controls',
                         style: AppTheme.bodySm.copyWith(
                           color: AppColors.inversePrimary,
                           fontWeight: FontWeight.w600,
@@ -406,28 +353,11 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
     );
   }
 
-  String _cardStatusLabel() {
-    switch (_cardStatus) {
-      case 'assigned':
-        return 'Active';
-      case 'not assigned':
-      case 'no card slot':
-        return 'No card issued yet';
-      case 'lost':
-        return 'Blocked — reported lost';
-      case 'stolen':
-        return 'Blocked — reported stolen';
-      case 'replaced':
-        return 'Replaced';
-      default:
-        return 'Unknown';
-    }
-  }
-
   // School, account number and card status, with the card actions.
   Widget _detailsCard() {
     final student = widget.student;
-    final cardActive = _cardStatus == 'assigned';
+    final canReport = cardCanBeReported(_cardStatus);
+    final retired = _cardStatus == 'lost' || _cardStatus == 'stolen';
 
     return Container(
       padding: const EdgeInsets.all(AppTheme.spaceMd),
@@ -472,16 +402,24 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
           _detailRow(
             'Card',
             Text(
-              _cardStatusLabel(),
+              cardStatusLabel(_cardStatus),
               style: AppTheme.bodyMd.copyWith(
-                color: (_cardStatus == 'lost' || _cardStatus == 'stolen')
+                color: (retired || _cardStatus == 'blocked')
                     ? AppColors.error
                     : AppColors.onSurface,
               ),
             ),
           ),
           const SizedBox(height: AppTheme.spaceMd),
-          if (cardActive)
+          if (_cardStatus == 'blocked') ...[
+            Text(
+              'Refused at the till until you unblock it in Controls. The '
+              'balance is kept.',
+              style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+            ),
+            const SizedBox(height: AppTheme.spaceMd),
+          ],
+          if (canReport)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -498,7 +436,7 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
             // Cards are linked by the school when it hands them over: a
             // card number proves nothing about who types it.
             Text(
-              (_cardStatus == 'lost' || _cardStatus == 'stolen')
+              retired
                   ? 'Buy a replacement card, or ask the school for one. The '
                       'school links it when they hand it over, and the balance '
                       'moves to it.'

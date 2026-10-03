@@ -10,8 +10,9 @@ class Student {
   /// 12-digit number the parent quotes to top up by USSD.
   final String? accountNumber;
 
-  /// "assigned" | "not assigned" | "lost" | "stolen" | "replaced" |
-  /// "no card slot". Null if the backend did not send card details.
+  /// "assigned" | "not assigned" | "blocked" | "lost" | "stolen" |
+  /// "replaced" | "no card slot". Null if the backend did not send card
+  /// details. "blocked" is a pause the parent can undo in Controls.
   final String? cardStatus;
   final String? cardUid;
 
@@ -41,3 +42,28 @@ class Student {
     );
   }
 }
+
+/// The card status in words, for the child's wallet screen.
+String cardStatusLabel(String? status) {
+  switch (status) {
+    case 'assigned':
+      return 'Active';
+    case 'not assigned':
+    case 'no card slot':
+      return 'No card issued yet';
+    case 'blocked':
+      return 'Blocked';
+    case 'lost':
+      return 'Blocked — reported lost';
+    case 'stolen':
+      return 'Blocked — reported stolen';
+    case 'replaced':
+      return 'Replaced';
+    default:
+      return 'Unknown';
+  }
+}
+
+/// A working card or a paused one can be reported lost or stolen.
+bool cardCanBeReported(String? status) =>
+    status == 'assigned' || status == 'blocked';
