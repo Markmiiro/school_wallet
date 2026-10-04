@@ -1,17 +1,18 @@
-// Premium Dashboard. Greeting header, a hero card that switches between
-// a waiting state (no children yet) and a total-family-balance state
-// (has children), a quick-actions row (Buy a Card / History), and child
-// cards showing school, account number and an animated balance count-up.
+// Home. Greeting header, then one of four things:
+//   - still loading: grey blocks;
+//   - could not load: what failed and "Try again" (never "no children",
+//     which would be a wrong answer rather than no answer);
+//   - nothing on the account yet: only the "Get started" panel, which
+//     names the next thing to do. No balance, no shortcuts, no empty
+//     "Your Children" box;
+//   - children: total family balance, quick actions (Buy a Card /
+//     History), a card per child, then what is left of "Get started".
 //
 // Parents do not create children here, and do not link cards. The school
 // registers each child with the guardian's phone number and links their
-// card at handout. When children wait on this parent's number, a banner
-// leads to ClaimChildrenScreen, which proves the number by SMS code once.
-//
-// NOTE: "Buy a Card" is a first-class action. Per the approved USSD
-// spec, registering a child = buying their UGX 25,000 card. The full
-// paid flow needs backend model changes (dob/class/card_color) — for
-// now this routes to the card-preview screen as a showcase.
+// card at handout. When children wait on this parent's number, the first
+// step (or a banner, once there are children) leads to
+// ClaimChildrenScreen, which proves the number by SMS code once.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -20,27 +21,44 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/animated_balance_counter.dart';
+import '../../../core/widgets/state_views.dart';
 import '../../../data/models/student.dart';
 import '../../../data/models/wallet_balance.dart';
+import '../../../data/services/api_client.dart';
+import '../../../data/services/card_service.dart';
 import '../../../data/services/family_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
 import '../../family/screens/claim_children_screen.dart';
 import '../../wallet/screens/child_wallet_detail_screen.dart';
+import '../get_started.dart';
 
 class DashboardScreen extends StatefulWidget {
   /// Switches the shell to the Transactions tab.
   final VoidCallback? onOpenTransactions;
 
-  const DashboardScreen({super.key, this.onOpenTransactions});
+  final FamilyService? familyService;
+  final CardService? cardService;
+
+  const DashboardScreen({
+    super.key,
+    this.onOpenTransactions,
+    this.familyService,
+    this.cardService,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final _family = FamilyService();
+  late final _family = widget.familyService ?? FamilyService();
+  late final _cards = widget.cardService ?? CardService();
   FamilyClaimable? _claimable;
+
+  // Children whose card is bought and waiting at the school.
+  Set<int> _cardPaidFor = {};
+  bool _checking = false;
 
   @override
   void initState() {
@@ -59,7 +77,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final claimable = await _family.claimable();
       if (mounted) setState(() => _claimable = claimable);
     } catch (_) {
-      // The banner is a convenience; the dashboard works without it.
+      // The dashboard works without it: the first step then says to ask
+      // the school, and "Check again" asks once more.
+    }
+    await _loadSetup(walletProvider);
+  }
+
+  // What "Get started" needs beyond children and balances, and only
+  // when a step depends on it.
+  Future<void> _loadSetup(WalletProvider wallet) async {
+    if (wallet.students.isEmpty) return;
+    // The history says whether money ever went in (a zero balance may
+    // be money already spent), and keeps the Transactions tab in step
+    // with a top-up just made from here.
+    await wallet.loadFamilyTransactions();
+    final without = [
+      for (final s in wallet.students)
+        if (s.neverHadCard) s.id,
+    ];
+    try {
+      final paid = without.isEmpty ? <int>{} : await _cards.paidFor(without);
+      if (mounted) setState(() => _cardPaidFor = paid);
+    } on SessionExpiredException {
+      // The router is already on its way back to the login screen.
     }
   }
 
@@ -68,6 +108,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (_) => ClaimChildrenScreen(claimable: _claimable!),
     ));
     if (added == true) await _load();
+  }
+
+  // "Check again" on the first step: the parent has just asked the
+  // school, so say plainly when there is still nothing.
+  Future<void> _checkAgain() async {
+    setState(() => _checking = true);
+    await _load();
+    if (!mounted) return;
+    setState(() => _checking = false);
+    final wallet = context.read<WalletProvider>();
+    final nothing = wallet.hasLoaded &&
+        wallet.students.isEmpty &&
+        (_claimable?.count ?? 0) == 0;
+    if (nothing) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Nothing yet. The school has not added your number.'),
+      ));
+    }
+  }
+
+  Future<void> _buyCard() async {
+    await context.push('/buy-card');
+    // A card may have been paid for in there: the step then says to
+    // collect it.
+    if (mounted) _load();
+  }
+
+  // A top-up is always for one child. With one child, go straight to
+  // their wallet; otherwise ask which.
+  void _topUp(WalletProvider wallet) {
+    if (wallet.students.length == 1) {
+      _openChild(wallet.students.first);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Choose a child below to top up their wallet.'),
+      ),
+    );
   }
 
   String _initials(String? name) {
@@ -93,6 +172,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final walletProvider = context.watch<WalletProvider>();
     final user = authProvider.currentUser;
     final hasChildren = walletProvider.students.isNotEmpty;
+    // Until the first load has come back there is no telling an empty
+    // account from one that has not loaded.
+    final loaded = walletProvider.hasLoaded;
+    final failed = !loaded && walletProvider.errorMessage != null;
+    final steps = setupStepsLeft(
+      students: walletProvider.students,
+      toppedUp: walletProvider.hasToppedUp,
+    );
+
+    final getStarted = GetStartedPanel(
+      steps: steps,
+      students: walletProvider.students,
+      waiting: _claimable?.count ?? 0,
+      phone: user?.phone,
+      paidFor: _cardPaidFor,
+      busy: _checking,
+      onAddChildren: _openClaim,
+      onCheckAgain: _checkAgain,
+      onBuyCard: _buyCard,
+      onTopUp: () => _topUp(walletProvider),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -100,6 +200,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: RefreshIndicator(
           onRefresh: _load,
           child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(
               AppTheme.marginMobile, AppTheme.spaceLg,
               AppTheme.marginMobile, AppTheme.spaceXl,
@@ -129,7 +230,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               const SizedBox(height: AppTheme.spaceLg),
 
-              Text('Welcome back,',
+              // Someone with nothing on the account has not been here
+              // before in any way that matters.
+              Text(loaded && !hasChildren ? 'Welcome,' : 'Welcome back,',
                   style: AppTheme.bodySm
                       .copyWith(color: AppColors.onSurfaceVariant)),
               Text(user?.name ?? 'there', style: AppTheme.headlineLgMobile)
@@ -139,50 +242,68 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               const SizedBox(height: AppTheme.spaceLg),
 
-              if ((_claimable?.count ?? 0) > 0) ...[
-                _claimBanner(_claimable!.count),
-                const SizedBox(height: AppTheme.spaceLg),
-              ],
-
-              // Hero card — switches on whether children exist
-              if (hasChildren)
-                _totalBalanceCard(walletProvider)
-              else
-                _onboardingCard(user?.phone),
-
-              const SizedBox(height: AppTheme.spaceLg),
-
-              // Quick actions
-              _quickActions(hasChildren),
-
-              const SizedBox(height: AppTheme.spaceLg),
-
-              // Children section
-              Row(
-                children: [
-                  Text('Your Children', style: AppTheme.headlineMd),
-                ],
-              ),
-              const SizedBox(height: AppTheme.spaceMd),
-
-              if (walletProvider.isLoading && !hasChildren)
-                const Padding(
-                  padding: EdgeInsets.all(AppTheme.spaceXl),
-                  child: Center(child: CircularProgressIndicator()),
+              if (failed)
+                LoadFailed(
+                  title: 'Could not load your account',
+                  message: walletProvider.errorMessage!,
+                  onRetry: _load,
                 )
+              else if (!loaded)
+                const LoadingBlocks(height: 88)
               else if (!hasChildren)
-                _emptyChildrenPlaceholder()
-              else
+                getStarted.animate().fadeIn(duration: 300.ms)
+              else ...[
+                // A refresh failed; what is shown is from the last one
+                // that worked.
+                if (walletProvider.errorMessage != null) ...[
+                  _staleNote(),
+                  const SizedBox(height: AppTheme.spaceMd),
+                ],
+
+                if ((_claimable?.count ?? 0) > 0) ...[
+                  _claimBanner(_claimable!.count),
+                  const SizedBox(height: AppTheme.spaceLg),
+                ],
+
+                _totalBalanceCard(walletProvider),
+                const SizedBox(height: AppTheme.spaceLg),
+
+                _quickActions(),
+                const SizedBox(height: AppTheme.spaceLg),
+
+                Text('Your Children', style: AppTheme.headlineMd),
+                const SizedBox(height: AppTheme.spaceMd),
+
                 ...walletProvider.students.asMap().entries.map((entry) {
                   final index = entry.key;
                   final student = entry.value;
                   final balance = walletProvider.balanceFor(student.id);
                   return _childCard(student, balance, index);
                 }),
+
+                // What is still missing comes after the children, so the
+                // balance and the children stay where they always are.
+                if (steps.isNotEmpty) ...[
+                  const SizedBox(height: AppTheme.spaceSm),
+                  getStarted,
+                ],
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _staleNote() {
+    return Row(
+      children: [
+        Expanded(
+          child: Text('Could not refresh. This is what loaded last time.',
+              style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+        ),
+        TextButton(onPressed: _load, child: const Text('Try again')),
+      ],
     );
   }
 
@@ -219,20 +340,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   foregroundColor: AppColors.onSecondaryContainer,
                   minimumSize: const Size(0, 40),
                 ),
-                onPressed: () {
-                  // A top-up is always for one child. With one child, go
-                  // straight to their wallet; otherwise ask which.
-                  if (wallet.students.length == 1) {
-                    _openChild(wallet.students.first);
-                    return;
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content:
-                          Text('Choose a child below to top up their wallet.'),
-                    ),
-                  );
-                },
+                onPressed: () => _topUp(wallet),
                 child: const Text('Top Up Wallet'),
               ),
             ],
@@ -273,110 +381,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ).animate().fadeIn(duration: 300.ms);
   }
 
-  Widget _onboardingCard(String? phone) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppTheme.spaceLg),
-      decoration: BoxDecoration(
-        color: AppColors.primaryContainer,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        boxShadow: [AppColors.level2Shadow],
-      ),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.onPrimaryContainer.withOpacity(0.15),
-            child: const Icon(Icons.school_rounded,
-                color: AppColors.onPrimaryContainer, size: 28),
-          ),
-          const SizedBox(height: AppTheme.spaceMd),
-          Text('No children linked yet', style: AppTheme.headlineMd.copyWith(color: AppColors.onPrimaryContainer)),
-          const SizedBox(height: AppTheme.spaceXs),
-          Text(
-            'Your child appears here once the school has added your phone '
-            'number${phone != null ? ' ($phone)' : ''} to their records. '
-            'Ask the school office, then pull down to refresh.',
-            textAlign: TextAlign.center,
-            style: AppTheme.bodySm.copyWith(color: AppColors.onPrimaryContainerMuted),
-          ),
-          const SizedBox(height: AppTheme.spaceMd),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondaryContainer,
-              foregroundColor: AppColors.onSecondaryContainer,
-            ),
-            onPressed: _load,
-            child: const Text('Check again'),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 120.ms).slideY(begin: 0.1, end: 0);
-  }
-
-  Widget _quickActions(bool hasChildren) {
+  Widget _quickActions() {
     return Row(
       children: [
-        _actionTile(Icons.credit_card_rounded, 'Buy a Card', true, () {
-          context.push('/buy-card');
-        }),
+        _actionTile(Icons.credit_card_rounded, 'Buy a Card', _buyCard),
         const SizedBox(width: AppTheme.spaceMd),
-        _actionTile(Icons.receipt_long_rounded, 'History', hasChildren,
+        _actionTile(Icons.receipt_long_rounded, 'History',
             () => widget.onOpenTransactions?.call()),
       ],
     ).animate().fadeIn(delay: 160.ms);
   }
 
-  Widget _actionTile(IconData icon, String label, bool enabled, VoidCallback onTap) {
+  Widget _actionTile(IconData icon, String label, VoidCallback onTap) {
     return Expanded(
-      child: Opacity(
-        opacity: enabled ? 1 : 0.5,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            onTap: enabled ? onTap : null,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceMd),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                border: Border.all(color: AppColors.level1CardBorder),
-              ),
-              child: Column(
-                children: [
-                  Icon(icon, color: AppColors.primary, size: 22),
-                  const SizedBox(height: 6),
-                  Text(label,
-                      textAlign: TextAlign.center,
-                      style: AppTheme.bodySm.copyWith(fontSize: 11)),
-                ],
-              ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceMd),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(color: AppColors.level1CardBorder),
+            ),
+            child: Column(
+              children: [
+                Icon(icon, color: AppColors.primary, size: 22),
+                const SizedBox(height: 6),
+                Text(label,
+                    textAlign: TextAlign.center,
+                    style: AppTheme.bodySm.copyWith(fontSize: 11)),
+              ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _emptyChildrenPlaceholder() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceXl),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        border: Border.all(
-          color: AppColors.outlineVariant,
-          width: 1.5,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.groups_rounded, size: 30, color: AppColors.outlineVariant),
-          const SizedBox(height: AppTheme.spaceSm),
-          Text('No children linked yet',
-              style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-        ],
       ),
     );
   }

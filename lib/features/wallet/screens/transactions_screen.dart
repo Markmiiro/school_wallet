@@ -2,6 +2,10 @@
 // one newest-first timeline, grouped by day, with a filter per child:
 // the parent's real question is what one child spent. Totals follow the
 // filter. Rows come from core/widgets/activity_feed.dart.
+//
+// Before any of that there may be nothing to show, for four different
+// reasons, and each says so in its own words: still loading, could not
+// load, no child on the account yet, and no activity yet.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -10,11 +14,17 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/activity_feed.dart';
 import '../../../core/widgets/animated_balance_counter.dart';
+import '../../../core/widgets/state_views.dart';
+import '../../../data/models/student.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
+import 'top_up_screen.dart';
 
 class TransactionsScreen extends StatefulWidget {
-  const TransactionsScreen({super.key});
+  /// Switches the shell to the Home tab.
+  final VoidCallback? onOpenHome;
+
+  const TransactionsScreen({super.key, this.onOpenHome});
 
   @override
   State<TransactionsScreen> createState() => _TransactionsScreenState();
@@ -40,6 +50,25 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     await wallet.loadFamilyTransactions();
   }
 
+  Future<void> _topUp(Student student, int walletId) async {
+    final done = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => TopUpScreen(walletId: walletId, studentName: student.name),
+    ));
+    if (done != true || !mounted) return;
+    final auth = context.read<AuthProvider>();
+    final wallet = context.read<WalletProvider>();
+    if (auth.currentUser != null) await wallet.loadForParent(auth.currentUser!.id);
+    await wallet.loadFamilyTransactions();
+  }
+
+  // One padded, always-scrollable page, so pull-to-refresh works even
+  // when the page holds a single short message.
+  Widget _page(List<Widget> children) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(AppTheme.marginMobile),
+        children: children,
+      );
+
   @override
   Widget build(BuildContext context) {
     final wallet = context.watch<WalletProvider>();
@@ -55,8 +84,44 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildBody(WalletProvider wallet) {
-    if (wallet.isHistoryLoading && wallet.familyTransactions.isEmpty) {
-      return _shimmerList();
+    if (!wallet.hasLoaded) {
+      if (wallet.errorMessage != null) {
+        return _page([
+          LoadFailed(
+            title: 'Could not load your transactions',
+            message: wallet.errorMessage!,
+            onRetry: _load,
+          ),
+        ]);
+      }
+      return _page([const LoadingBlocks(count: 6)]);
+    }
+
+    if (wallet.students.isEmpty) {
+      return _page([
+        EmptyActivity(
+          title: 'Nothing here yet',
+          body: 'Top-ups and tuck shop purchases show here once your child '
+              'is on your account. Home shows what to do first.',
+          actionLabel: widget.onOpenHome == null ? null : 'Go to Home',
+          onAction: widget.onOpenHome,
+        ),
+      ]);
+    }
+
+    if (wallet.familyTransactions.isEmpty) {
+      if (wallet.isHistoryLoading) {
+        return _page([const LoadingBlocks(count: 6)]);
+      }
+      if (wallet.historyError != null) {
+        return _page([
+          LoadFailed(
+            title: 'Could not load your transactions',
+            message: wallet.historyError!,
+            onRetry: _load,
+          ),
+        ]);
+      }
     }
 
     // A child who is no longer in the list falls back to the family.
@@ -65,15 +130,24 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     final items = activityFor(wallet.familyTransactions, studentId);
     final firstName = student?.name.split(' ').first;
 
-    return ListView(
-      padding: const EdgeInsets.all(AppTheme.marginMobile),
-      children: [
-        if (wallet.students.length > 1) ...[
-          _childFilter(wallet, studentId),
-          const SizedBox(height: AppTheme.spaceMd),
-        ],
+    // Totals of nothing are two empty boxes: leave them out until money
+    // has moved.
+    final hasTotals = items.isNotEmpty ||
+        wallet.totalInFor(studentId) > 0 ||
+        wallet.totalOutFor(studentId) > 0;
 
-        // Totals row
+    return _page([
+      if (wallet.students.length > 1) ...[
+        _childFilter(wallet, studentId),
+        const SizedBox(height: AppTheme.spaceMd),
+      ],
+
+      if (wallet.historyFailedFor.isNotEmpty) ...[
+        _partFailed(wallet.historyFailedFor),
+        const SizedBox(height: AppTheme.spaceMd),
+      ],
+
+      if (hasTotals) ...[
         Row(
           children: [
             Expanded(
@@ -95,9 +169,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             ),
           ],
         ).animate().fadeIn(duration: 400.ms),
-
         const SizedBox(height: AppTheme.spaceLg),
+      ],
 
+      if (items.isEmpty)
+        _emptyState(wallet, student)
+      else ...[
         Text(
           firstName == null ? 'Recent activity' : '$firstName\'s activity',
           style: AppTheme.headlineMd,
@@ -106,18 +183,47 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         ).animate().fadeIn(delay: 100.ms),
         const SizedBox(height: AppTheme.spaceSm),
 
-        if (items.isEmpty)
-          _emptyState(firstName)
-        else ...[
-          // Top-ups but no purchase yet: say so rather than leave the
-          // parent wondering whether purchases are missing.
-          if (firstName != null && !hasSpent(items) && wallet.totalOutFor(studentId) == 0)
-            NothingSpentNote(name: firstName),
-          ActivityFeed(items: items, showChild: studentId == null)
-              .animate()
-              .fadeIn(duration: 350.ms),
-        ],
+        // Top-ups but no purchase yet: say so rather than leave the
+        // parent wondering whether purchases are missing.
+        if (firstName != null && !hasSpent(items) && wallet.totalOutFor(studentId) == 0)
+          NothingSpentNote(name: firstName),
+        ActivityFeed(items: items, showChild: studentId == null)
+            .animate()
+            .fadeIn(duration: 350.ms),
       ],
+    ]);
+  }
+
+  // Some children's history did not come back; the rest is shown.
+  Widget _partFailed(List<String> names) {
+    final who = names.map((n) => n.split(' ').first).join(', ');
+    return Row(
+      children: [
+        Expanded(
+          child: Text('Could not load activity for $who.',
+              style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+        ),
+        TextButton(onPressed: _load, child: const Text('Try again')),
+      ],
+    );
+  }
+
+  // No activity for the family, or for the chosen child. The way to make
+  // some appear is a top-up, so offer it when it is clear whose wallet:
+  // the chosen child's, or the only child's.
+  Widget _emptyState(WalletProvider wallet, Student? chosen) {
+    final target = chosen ?? (wallet.students.length == 1 ? wallet.students.first : null);
+    final balance = target == null ? null : wallet.balanceFor(target.id);
+    final canTopUp = target != null && balance != null && balance.isActive;
+    final copy = emptyActivityCopy(
+      firstName: chosen?.name.split(' ').first,
+      hasCard: !(chosen?.neverHadCard ?? false),
+    );
+    return EmptyActivity(
+      title: copy.title,
+      body: copy.body,
+      actionLabel: canTopUp ? 'Top up' : null,
+      onAction: canTopUp ? () => _topUp(target, balance.walletId) : null,
     );
   }
 
@@ -203,57 +309,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _emptyState(String? firstName) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceXl * 1.5),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(Icons.receipt_long_outlined,
-                    size: 48, color: AppColors.outlineVariant)
-                .animate(onPlay: (c) => c.repeat(reverse: true))
-                .fadeIn()
-                .moveY(begin: -4, end: 4, duration: 1600.ms),
-            const SizedBox(height: AppTheme.spaceMd),
-            Text(firstName == null ? 'No transactions yet' : '$firstName has no activity yet',
-                style: AppTheme.headlineMd
-                    .copyWith(color: AppColors.onSurfaceVariant, fontSize: 16)),
-            const SizedBox(height: AppTheme.spaceXs),
-            Text(
-              firstName == null
-                  ? 'Top-ups and tuck-shop purchases will show up here.'
-                  : '$firstName has not spent anything yet. Purchases at the '
-                      'tuck shop will show up here.',
-              textAlign: TextAlign.center,
-              style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _shimmerList() {
-    return ListView(
-      padding: const EdgeInsets.all(AppTheme.marginMobile),
-      children: List.generate(6, (i) {
-        return Container(
-          height: 64,
-          margin: const EdgeInsets.only(bottom: AppTheme.spaceSm),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          ),
-        )
-            .animate(onPlay: (c) => c.repeat())
-            .shimmer(
-              duration: 1200.ms,
-              color: AppColors.surfaceContainerHighest,
-            );
-      }),
     );
   }
 }

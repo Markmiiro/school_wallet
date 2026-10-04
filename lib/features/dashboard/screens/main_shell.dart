@@ -18,13 +18,14 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _index = 0;
 
+  static const int _homeTab = 0;
   static const int _transactionsTab = 1;
 
   late final List<Widget> _tabs = [
     DashboardScreen(
       onOpenTransactions: () => setState(() => _index = _transactionsTab),
     ),
-    const TransactionsScreen(),
+    TransactionsScreen(onOpenHome: () => setState(() => _index = _homeTab)),
     const ProfileScreen(),
   ];
 

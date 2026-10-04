@@ -100,4 +100,35 @@ class CardService {
       throw Exception('Could not check the card payment.');
     }
   }
+
+  /// True if any of a child's orders is paid and not yet handed over.
+  static bool hasPaidOrder(Map<String, dynamic> body) =>
+      (body['orders'] as List? ?? const [])
+          .any((o) => o is Map && o['status'] == 'paid');
+
+  /// GET /cards/orders/student/{id} for each child: which of them have a
+  /// card that is paid for and waiting at the school. A child whose
+  /// orders cannot be read is left out; the server refuses a second
+  /// payment for the same card in any case.
+  Future<Set<int>> paidFor(Iterable<int> studentIds) async {
+    final headers = await ApiClient.authHeaders();
+    final paid = <int>{};
+    await Future.wait(studentIds.map((id) async {
+      try {
+        final response = await http
+            .get(Uri.parse(ApiConstants.cardOrdersForStudent(id)), headers: headers)
+            .timeout(const Duration(seconds: 15));
+        await ApiClient.ensureAuthorized(response);
+        if (response.statusCode == 200 &&
+            hasPaidOrder(jsonDecode(response.body) as Map<String, dynamic>)) {
+          paid.add(id);
+        }
+      } on SessionExpiredException {
+        rethrow;
+      } catch (_) {
+        // Not known for this child.
+      }
+    }));
+    return paid;
+  }
 }

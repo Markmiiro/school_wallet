@@ -253,3 +253,63 @@ class NothingSpentNote extends StatelessWidget {
     );
   }
 }
+
+/// What an empty activity list says: what will show there, and what
+/// makes it show. [firstName] is null for the whole family. [hasCard]
+/// is false for a child who has never had a card, who cannot spend yet.
+({String title, String body}) emptyActivityCopy({
+  String? firstName,
+  bool hasCard = true,
+}) {
+  const topUps = 'A top-up shows here as soon as you make one.';
+  if (firstName == null) {
+    return (
+      title: 'No activity yet',
+      body: '$topUps Purchases show when your child pays at the tuck shop '
+          'with their card.',
+    );
+  }
+  return (
+    title: '$firstName has no activity yet',
+    body: hasCard
+        ? '$topUps Purchases show when $firstName pays at the tuck shop '
+            'with the card.'
+        : '$topUps Purchases show once $firstName has a card and pays with '
+            'it at the tuck shop.',
+  );
+}
+
+/// Stands where the activity list would be when there is none.
+class EmptyActivity extends StatelessWidget {
+  final String title;
+  final String body;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const EmptyActivity({
+    super.key,
+    required this.title,
+    required this.body,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTheme.bodyMd.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: AppTheme.spaceXs),
+          Text(body, style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: AppTheme.spaceMd),
+            OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
+          ],
+        ],
+      ),
+    );
+  }
+}

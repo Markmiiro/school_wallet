@@ -3,6 +3,8 @@
 // Wallet Detail, and Transactions screens.
 
 import 'package:flutter/material.dart';
+import '../core/load_error.dart';
+import '../data/services/api_client.dart';
 import '../data/services/wallet_service.dart';
 import '../data/models/student.dart';
 import '../data/models/wallet_balance.dart';
@@ -23,10 +25,18 @@ class FamilyTransaction {
 }
 
 class WalletProvider extends ChangeNotifier {
-  final WalletService _walletService = WalletService();
+  final WalletService _walletService;
+
+  WalletProvider({WalletService? service})
+      : _walletService = service ?? WalletService();
 
   bool isLoading = false;
   String? errorMessage;
+
+  /// True once this parent's children have loaded at least once. Until
+  /// then an empty [students] means "not known yet", not "no children":
+  /// screens show a loading or an error state, never an empty one.
+  bool hasLoaded = false;
 
   List<Student> students = [];
   Map<int, WalletBalance> balances = {};
@@ -34,10 +44,15 @@ class WalletProvider extends ChangeNotifier {
   // Whose data is currently held. If a different parent logs in on the
   // same device, everything below is dropped before anything is shown.
   int? _parentId;
+  Future<void>? _loading;
+  Future<void>? _historyLoading;
 
   // Merged family-transactions feed state.
   bool isHistoryLoading = false;
   String? historyError;
+
+  /// Children whose history could not be read on the last load.
+  List<String> historyFailedFor = [];
   List<FamilyTransaction> familyTransactions = [];
   double totalIn = 0;
   double totalOut = 0;
@@ -54,15 +69,40 @@ class WalletProvider extends ChangeNotifier {
   double totalOutFor(int? studentId) =>
       studentId == null ? totalOut : (_outByStudent[studentId] ?? 0);
 
+  /// Whether money has ever gone into any child's wallet. Null while it
+  /// is not known: a balance of zero may be money already spent, so the
+  /// answer then needs every child's history.
+  bool? get hasToppedUp {
+    if (balances.values.any((b) => b.balance > 0)) return true;
+    if (students.any((s) => (_inByStudent[s.id] ?? 0) > 0)) return true;
+    if (students.every((s) => _inByStudent.containsKey(s.id))) return false;
+    return null;
+  }
+
   /// Loads all of a parent's children, then loads each child's wallet
   /// balance. A single wallet failing doesn't fail the whole screen —
   /// that student just won't have a balance entry.
-  Future<void> loadForParent(int parentId) async {
+  ///
+  /// Home and Transactions both ask at startup; a second call for the
+  /// same parent while one is running waits for that one.
+  Future<void> loadForParent(int parentId) {
+    final running = _loading;
+    if (running != null && _parentId == parentId) return running;
+    final load = _loadForParent(parentId);
+    _loading = load;
+    return load.whenComplete(() {
+      if (identical(_loading, load)) _loading = null;
+    });
+  }
+
+  Future<void> _loadForParent(int parentId) async {
     if (_parentId != parentId) {
       _parentId = parentId;
+      hasLoaded = false;
       students = [];
       balances = {};
       familyTransactions = [];
+      historyFailedFor = [];
       totalIn = 0;
       totalOut = 0;
       _inByStudent = {};
@@ -87,12 +127,18 @@ class WalletProvider extends ChangeNotifier {
         }
       }
 
+      if (_parentId != parentId) return; // another parent signed in meanwhile
       students = loadedStudents;
       balances = loadedBalances;
+      hasLoaded = true;
+      isLoading = false;
+      notifyListeners();
+    } on SessionExpiredException {
+      // The router is already on its way back to the login screen.
       isLoading = false;
       notifyListeners();
     } catch (e) {
-      errorMessage = e.toString();
+      errorMessage = loadErrorText(e);
       isLoading = false;
       notifyListeners();
     }
@@ -103,11 +149,28 @@ class WalletProvider extends ChangeNotifier {
   /// Loads every child's wallet history and merges them into one
   /// newest-first family feed. Individual failures are skipped so one
   /// child's error doesn't break the whole feed. Loads in parallel.
-  Future<void> loadFamilyTransactions() async {
+  ///
+  /// Home and Transactions both ask; a call made while one is running
+  /// waits for that one.
+  Future<void> loadFamilyTransactions() {
+    final running = _historyLoading;
+    if (running != null) return running;
+    final load = _loadFamilyTransactions();
+    _historyLoading = load;
+    return load.whenComplete(() {
+      if (identical(_historyLoading, load)) _historyLoading = null;
+    });
+  }
+
+  Future<void> _loadFamilyTransactions() async {
     if (students.isEmpty) {
       familyTransactions = [];
+      historyFailedFor = [];
+      historyError = null;
       totalIn = 0;
       totalOut = 0;
+      _inByStudent = {};
+      _outByStudent = {};
       notifyListeners();
       return;
     }
@@ -122,6 +185,8 @@ class WalletProvider extends ChangeNotifier {
           try {
             final history = await _walletService.getWalletHistory(s.id);
             return MapEntry(s, history);
+          } on SessionExpiredException {
+            rethrow;
           } catch (_) {
             return MapEntry<Student, WalletHistory?>(s, null);
           }
@@ -133,11 +198,15 @@ class WalletProvider extends ChangeNotifier {
       double tOut = 0;
       final inBy = <int, double>{};
       final outBy = <int, double>{};
+      final failed = <String>[];
 
       for (final entry in results) {
         final student = entry.key;
         final history = entry.value;
-        if (history == null) continue;
+        if (history == null) {
+          failed.add(student.name);
+          continue;
+        }
         tIn += history.totalToppedUp;
         tOut += history.totalSpent;
         inBy[student.id] = history.totalToppedUp;
@@ -158,10 +227,20 @@ class WalletProvider extends ChangeNotifier {
       totalOut = tOut;
       _inByStudent = inBy;
       _outByStudent = outBy;
+      historyFailedFor = failed;
+      // Nothing came back for anyone: that is a failure, not "no
+      // transactions yet".
+      if (failed.length == results.length) {
+        historyError = 'Could not load the transactions. Check your '
+            'connection and try again.';
+      }
+      isHistoryLoading = false;
+      notifyListeners();
+    } on SessionExpiredException {
       isHistoryLoading = false;
       notifyListeners();
     } catch (e) {
-      historyError = e.toString();
+      historyError = loadErrorText(e);
       isHistoryLoading = false;
       notifyListeners();
     }

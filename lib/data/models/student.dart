@@ -29,6 +29,12 @@ class Student {
   /// True only when a physical card is linked and usable.
   bool get hasActiveCard => cardStatus == 'assigned';
 
+  /// True when no card has ever been linked to this child. A lost,
+  /// blocked or replaced card is a different matter, handled on the
+  /// child's own screen.
+  bool get neverHadCard =>
+      cardStatus == 'not assigned' || cardStatus == 'no card slot';
+
   factory Student.fromJson(Map<String, dynamic> json) {
     final nfc = json['nfc'] as Map<String, dynamic>?;
     return Student(

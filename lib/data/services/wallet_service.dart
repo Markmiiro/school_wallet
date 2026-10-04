@@ -12,6 +12,10 @@ import '../models/wallet_balance.dart';
 import '../models/wallet_history.dart';
 
 class WalletService {
+  // A read that never answers must end as "could not load", not as a
+  // loading state that stays for ever.
+  static const _readTimeout = Duration(seconds: 20);
+
   /// GET /students/parent/{parentId}
   /// Returns the list of children belonging to a parent.
   Future<List<Student>> getStudentsForParent(int parentId) async {
@@ -19,7 +23,7 @@ class WalletService {
     final response = await http.get(
       Uri.parse(ApiConstants.studentsForParent(parentId)),
       headers: headers,
-    );
+    ).timeout(_readTimeout);
     await ApiClient.ensureAuthorized(response);
 
     if (response.statusCode == 200) {
@@ -43,7 +47,7 @@ class WalletService {
     final response = await http.get(
       Uri.parse(ApiConstants.walletBalance(studentId)),
       headers: headers,
-    );
+    ).timeout(_readTimeout);
     await ApiClient.ensureAuthorized(response);
 
     if (response.statusCode == 200) {
@@ -64,7 +68,7 @@ class WalletService {
     final response = await http.get(
       Uri.parse(ApiConstants.walletHistory(studentId, limit: limit)),
       headers: headers,
-    );
+    ).timeout(_readTimeout);
     await ApiClient.ensureAuthorized(response);
 
     if (response.statusCode == 200) {
@@ -90,8 +94,10 @@ class WalletService {
   /// GET /wallets/{studentId}/controls — limit, today's spend, card state
   /// and the history of changes.
   Future<SpendingControls> getControls(int studentId) async {
-    final response = await http.get(Uri.parse(ApiConstants.walletControls(studentId)),
-        headers: await ApiClient.authHeaders());
+    final response = await http
+        .get(Uri.parse(ApiConstants.walletControls(studentId)),
+            headers: await ApiClient.authHeaders())
+        .timeout(_readTimeout);
     await ApiClient.ensureAuthorized(response);
     final data = jsonDecode(response.body);
     if (response.statusCode == 200) {

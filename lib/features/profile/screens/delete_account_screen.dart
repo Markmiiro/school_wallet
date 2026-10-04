@@ -9,7 +9,9 @@ import 'package:intl/intl.dart';
 import 'package:pinput/pinput.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/load_error.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/state_views.dart';
 import '../../../data/models/account_closure.dart';
 import '../../../data/services/account_service.dart';
 import '../../../providers/auth_provider.dart';
@@ -98,9 +100,11 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
             if (snap.hasError) {
               return Padding(
                 padding: const EdgeInsets.all(AppTheme.marginMobile),
-                child: Text(
-                  snap.error.toString().replaceFirst('Exception: ', ''),
-                  style: AppTheme.bodyMd,
+                child: LoadFailed(
+                  title: 'Could not load your account details',
+                  message: loadErrorText(snap.error!),
+                  onRetry: () =>
+                      setState(() => _preview = _service.fetchPreview()),
                 ),
               );
             }

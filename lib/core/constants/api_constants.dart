@@ -126,6 +126,11 @@ class ApiConstants {
   static String cardOrderStatus(String referenceId) =>
       '$baseUrl/cards/orders/$referenceId';
 
+  // GET /cards/orders/student/{studentId} — that child's orders, newest
+  // first. "paid" means bought and waiting for the school to hand it over.
+  static String cardOrdersForStudent(int studentId) =>
+      '$baseUrl/cards/orders/student/$studentId';
+
   // ── Schools ───────────────────────────────────────────────
   static const String schools = '$baseUrl/schools/';
 

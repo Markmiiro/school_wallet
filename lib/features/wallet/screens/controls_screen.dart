@@ -10,8 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/load_error.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/pin_confirm_sheet.dart';
+import '../../../core/widgets/state_views.dart';
 import '../../../data/models/spending_controls.dart';
 import '../../../data/models/student.dart';
 import '../../../data/services/api_client.dart';
@@ -52,7 +54,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
     } on SessionExpiredException {
       // The router returns to login.
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = loadErrorText(e));
     }
   }
 
@@ -147,14 +149,19 @@ class _ControlsScreenState extends State<ControlsScreen> {
       backgroundColor: AppColors.surface,
       appBar: AppBar(title: Text('${widget.student.name} · Controls')),
       body: _controls == null
-          ? Center(
-              child: _error == null
-                  ? const CircularProgressIndicator()
-                  : Padding(
-                      padding: const EdgeInsets.all(AppTheme.marginMobile),
-                      child: Text(_error!, style: AppTheme.bodyMd),
-                    ),
-            )
+          ? (_error == null
+              ? const Center(child: CircularProgressIndicator())
+              : Padding(
+                  padding: const EdgeInsets.all(AppTheme.marginMobile),
+                  child: LoadFailed(
+                    title: 'Could not load the controls',
+                    message: _error!,
+                    onRetry: () {
+                      setState(() => _error = null);
+                      _load();
+                    },
+                  ),
+                ))
           : RefreshIndicator(onRefresh: _load, child: _body(_controls!)),
     );
   }

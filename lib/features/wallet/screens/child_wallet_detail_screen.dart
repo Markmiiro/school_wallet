@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/load_error.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/activity_feed.dart';
 import '../../../core/widgets/animated_balance_counter.dart';
@@ -71,7 +72,7 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = loadErrorText(e);
         _isLoading = false;
       });
     }
@@ -256,28 +257,30 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
 
         const SizedBox(height: AppTheme.spaceLg),
 
-        // Summary row
-        Row(
-          children: [
-            Expanded(
-              child: _summaryTile(
-                label: 'Topped Up',
-                value: history.totalToppedUp,
-                color: AppColors.moneyIn,
+        // Summary row. Totals of nothing are two empty boxes: left out
+        // until money has moved.
+        if (history.totalToppedUp > 0 || history.totalSpent > 0 || items.isNotEmpty) ...[
+          Row(
+            children: [
+              Expanded(
+                child: _summaryTile(
+                  label: 'Topped Up',
+                  value: history.totalToppedUp,
+                  color: AppColors.moneyIn,
+                ),
               ),
-            ),
-            const SizedBox(width: AppTheme.spaceMd),
-            Expanded(
-              child: _summaryTile(
-                label: 'Spent',
-                value: history.totalSpent,
-                color: AppColors.moneyOut,
+              const SizedBox(width: AppTheme.spaceMd),
+              Expanded(
+                child: _summaryTile(
+                  label: 'Spent',
+                  value: history.totalSpent,
+                  color: AppColors.moneyOut,
+                ),
               ),
-            ),
-          ],
-        ).animate().fadeIn(delay: 100.ms),
-
-        const SizedBox(height: AppTheme.spaceLg),
+            ],
+          ).animate().fadeIn(delay: 100.ms),
+          const SizedBox(height: AppTheme.spaceLg),
+        ],
 
         SizedBox(
           width: double.infinity,
@@ -316,22 +319,27 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
         const SizedBox(height: AppTheme.spaceSm),
 
         // This child's transactions only, grouped by day.
-        if (history.totalSpent == 0 && !hasSpent(items))
-          NothingSpentNote(name: firstName).animate().fadeIn(delay: 225.ms),
         if (items.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceLg),
-            child: Text(
-              'Top-ups and tuck-shop purchases will show up here.',
-              style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-            ),
-          )
-        else
+          _noActivity(firstName)
+        else ...[
+          if (history.totalSpent == 0 && !hasSpent(items))
+            NothingSpentNote(name: firstName).animate().fadeIn(delay: 225.ms),
           ActivityFeed(items: items, showChild: false)
               .animate()
               .fadeIn(delay: 250.ms),
+        ],
       ],
     );
+  }
+
+  // Nothing has happened in this wallet: say what will show here and
+  // what makes it show. Top Up is the button just above.
+  Widget _noActivity(String firstName) {
+    final noCard = _cardStatus == 'not assigned' || _cardStatus == 'no card slot';
+    final copy = emptyActivityCopy(firstName: firstName, hasCard: !noCard);
+    return EmptyActivity(title: copy.title, body: copy.body)
+        .animate()
+        .fadeIn(delay: 225.ms);
   }
 
   Widget _deactivatedBanner() {

@@ -18,6 +18,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/state_views.dart';
 import '../../../data/models/student.dart';
 import '../../../data/services/api_client.dart';
 import '../../../data/services/card_service.dart';
@@ -81,6 +82,9 @@ class _BuyCardScreenState extends State<BuyCardScreen> {
     // The parent usually pays from the number they log in with.
     final phone = context.read<AuthProvider>().currentUser?.phone ?? '';
     if (phone.startsWith('256')) _phoneController.text = phone.substring(3);
+    // Opened straight from its address (a reload on the web), nothing
+    // has loaded the children yet.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadChildren());
     // Gentle ambient float when not being dragged.
     _idle = Timer.periodic(const Duration(milliseconds: 50), (_) {
       if (!_dragging && mounted) {
@@ -91,6 +95,13 @@ class _BuyCardScreenState extends State<BuyCardScreen> {
         });
       }
     });
+  }
+
+  Future<void> _loadChildren() async {
+    final wallet = context.read<WalletProvider>();
+    final parentId = context.read<AuthProvider>().currentUser?.id;
+    if (wallet.hasLoaded || parentId == null) return;
+    await wallet.loadForParent(parentId);
   }
 
   double _sin(double x) => math.sin(x);
@@ -226,7 +237,7 @@ class _BuyCardScreenState extends State<BuyCardScreen> {
       body: SafeArea(
         child: switch (_stage) {
           BuyCardStage.form =>
-            _buildForm(option, wallet.students, eligible, student),
+            _buildForm(option, wallet, eligible, student),
           BuyCardStage.waiting => _buildWaiting(),
           BuyCardStage.success => _buildSuccess(option, student),
           BuyCardStage.failed => _buildFailed(),
@@ -237,10 +248,11 @@ class _BuyCardScreenState extends State<BuyCardScreen> {
 
   Widget _buildForm(
     CardOption option,
-    List<Student> students,
+    WalletProvider wallet,
     List<Student> eligible,
     Student? student,
   ) {
+    final students = wallet.students;
     return ListView(
       padding: const EdgeInsets.all(AppTheme.marginMobile),
       children: [
@@ -276,7 +288,15 @@ class _BuyCardScreenState extends State<BuyCardScreen> {
 
         const SizedBox(height: AppTheme.spaceXl),
 
-        if (student == null)
+        if (!wallet.hasLoaded)
+          wallet.errorMessage != null
+              ? LoadFailed(
+                  title: 'Could not load your children',
+                  message: wallet.errorMessage!,
+                  onRetry: _loadChildren,
+                )
+              : const LoadingBlocks(count: 2)
+        else if (student == null)
           _noChildNotice(students.isEmpty)
         else ...[
           if (eligible.length > 1) ...[
