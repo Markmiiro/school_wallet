@@ -6,10 +6,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/brand_assets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/auth_provider.dart';
 import 'terms_screen.dart';
@@ -173,8 +175,8 @@ class _LoginScreenState extends State<LoginScreen>
               // Brand row
               Row(
                 children: [
-                  Icon(Icons.account_balance_wallet_rounded,
-                      color: AppColors.primary, size: 28),
+                  SvgPicture.asset(BrandAssets.mark,
+                      height: 24, excludeFromSemantics: true),
                   const SizedBox(width: AppTheme.spaceSm),
                   Text('Nuvora', style: AppTheme.headlineMd),
                 ],

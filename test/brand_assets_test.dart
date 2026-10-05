@@ -40,4 +40,22 @@ void main() {
       expect(find.byType(SvgPicture), findsOneWidget);
     }
   });
+
+  test('the brand row shows the mark, not a stand-in icon', () {
+    // The Login and Home headers once used a wallet icon as the logo.
+    for (final path in [
+      'lib/features/auth/screens/login_screen.dart',
+      'lib/features/dashboard/screens/dashboard_screen.dart',
+    ]) {
+      final src = File(path).readAsStringSync();
+      expect(src, contains('SvgPicture.asset(BrandAssets.mark'), reason: path);
+    }
+    final standIns = Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.dart'))
+        .where((f) => f.readAsStringSync().contains('Icons.account_balance_wallet'))
+        .map((f) => f.path);
+    expect(standIns, isEmpty);
+  });
 }
