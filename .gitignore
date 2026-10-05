@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Internal design reference: notes on what is not built yet. This repo is
+# public, so it stays on this machine only.
+/docs/design/nuvora-app-launch.html
+/docs/design/designer-questions.md

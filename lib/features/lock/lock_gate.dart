@@ -172,7 +172,7 @@ class _LockScreenState extends State<LockScreen> {
                   enabled: !_busy,
                   defaultPinTheme: pinTheme,
                   focusedPinTheme: pinTheme.copyDecorationWith(
-                    border: Border.all(color: AppColors.secondaryContainer, width: 2),
+                    border: Border.all(color: AppColors.accent, width: 2),
                   ),
                   onCompleted: _submitPin,
                 ),
@@ -195,10 +195,6 @@ class _LockScreenState extends State<LockScreen> {
                 if (_credentialId != null) ...[
                   const SizedBox(height: AppTheme.spaceSm),
                   ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondaryContainer,
-                      foregroundColor: AppColors.onSecondaryContainer,
-                    ),
                     onPressed: _busy ? null : _useBiometric,
                     icon: const Icon(Icons.fingerprint_rounded),
                     label: const Text('Use fingerprint or face'),

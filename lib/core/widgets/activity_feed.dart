@@ -3,8 +3,8 @@
 //
 // Activity is grouped by day under one date header, so a row carries
 // only the time. A purchase and a top-up are different rows: a purchase
-// shows the tuck shop and a minus amount in ink, a top-up a plus amount
-// in teal. The amount and the time sit in a column of their own on the
+// shows the tuck shop and a minus amount, a top-up a plus amount and a
+// teal mark; both amounts are ink. The amount and the time sit in a column of their own on the
 // right and are never cut; a long tuck shop name wraps to two lines.
 
 import 'package:flutter/material.dart';
@@ -126,6 +126,8 @@ class ActivityRow extends StatelessWidget {
     final tone = !settled
         ? AppColors.onSurfaceVariant
         : (isIn ? AppColors.moneyIn : AppColors.moneyOut);
+    // The teal on a row: the mark on a top-up that went through.
+    final markTone = settled && isIn ? AppColors.cleared : tone;
     final muted = AppTheme.bodySm.copyWith(fontSize: 12, color: AppColors.onSurfaceVariant);
 
     final icon = tx.isFailed
@@ -164,9 +166,9 @@ class ActivityRow extends StatelessWidget {
           CircleAvatar(
             radius: 18,
             backgroundColor: settled && isIn
-                ? AppColors.moneyIn.withValues(alpha: 0.12)
+                ? AppColors.cleared.withValues(alpha: 0.12)
                 : AppColors.surfaceContainerHighest,
-            child: Icon(icon, size: 18, color: tone),
+            child: Icon(icon, size: 18, color: markTone),
           ),
           const SizedBox(width: AppTheme.spaceMd),
           Expanded(

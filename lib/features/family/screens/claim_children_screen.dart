@@ -138,10 +138,6 @@ class _ClaimChildrenScreenState extends State<ClaimChildrenScreen> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondaryContainer,
-              foregroundColor: AppColors.onSecondaryContainer,
-            ),
             onPressed: _busy
                 ? null
                 : verified
@@ -177,7 +173,7 @@ class _ClaimChildrenScreenState extends State<ClaimChildrenScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.check_circle_rounded, color: AppColors.secondary, size: 48),
+        Icon(Icons.check_circle_rounded, color: AppColors.success, size: 48),
         const SizedBox(height: AppTheme.spaceMd),
         Text('Added to your account', style: AppTheme.headlineMd),
         const SizedBox(height: AppTheme.spaceSm),

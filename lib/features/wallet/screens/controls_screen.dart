@@ -193,7 +193,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
               value: c.spentFraction,
               minHeight: 8,
               backgroundColor: AppColors.surfaceContainerHighest,
-              color: over ? AppColors.error : AppColors.secondary,
+              color: over ? AppColors.error : AppColors.accent,
             ),
           ),
           const SizedBox(height: AppTheme.spaceSm),
@@ -238,10 +238,6 @@ class _ControlsScreenState extends State<ControlsScreen> {
                     label: const Text('Block card'),
                   )
                 : ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondaryContainer,
-                      foregroundColor: AppColors.onSecondaryContainer,
-                    ),
                     onPressed: _busy ? null : () => _setBlocked(false),
                     icon: const Icon(Icons.check_circle_rounded),
                     label: const Text('Unblock card'),
@@ -300,7 +296,7 @@ class _ControlsScreenState extends State<ControlsScreen> {
       };
 
   Color _cardColor(String state) => switch (state) {
-        'active' => AppColors.secondary,
+        'active' => AppColors.success,
         'blocked' => AppColors.error,
         _ => AppColors.onSurfaceVariant,
       };

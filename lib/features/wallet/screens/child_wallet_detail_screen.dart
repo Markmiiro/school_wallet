@@ -211,7 +211,7 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(AppTheme.spaceLg),
           decoration: BoxDecoration(
-            color: AppColors.primaryContainer,
+            color: AppColors.balanceCard,
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
             boxShadow: [AppColors.level2Shadow],
           ),
@@ -220,12 +220,13 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
             children: [
               Text(
                 'Current Balance',
-                style: AppTheme.bodySm.copyWith(color: AppColors.onPrimaryContainerMuted),
+                style: AppTheme.bodySm.copyWith(
+                    color: AppColors.onBalanceCard, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: AppTheme.spaceXs),
               AnimatedBalanceCounter(
                 balance: history.currentBalance,
-                style: AppTheme.displayCurrency.copyWith(color: AppColors.onPrimaryContainer),
+                style: AppTheme.displayCurrency.copyWith(color: AppColors.onBalanceCard),
               ),
               if (history.dailyLimit != null) ...[
                 const SizedBox(height: AppTheme.spaceSm),
@@ -235,7 +236,8 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
                       child: Text(
                         'Daily limit UGX ${_ugx.format(history.dailyLimit)}',
                         style: AppTheme.bodySm.copyWith(
-                            color: AppColors.onPrimaryContainerMuted),
+                            color: AppColors.onBalanceCard,
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                     TextButton(
@@ -243,8 +245,9 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
                       child: Text(
                         'Controls',
                         style: AppTheme.bodySm.copyWith(
-                          color: AppColors.inversePrimary,
-                          fontWeight: FontWeight.w600,
+                          color: AppColors.onBalanceCard,
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.underline,
                         ),
                       ),
                     ),
@@ -284,7 +287,9 @@ class _ChildWalletDetailScreenState extends State<ChildWalletDetailScreen> {
 
         SizedBox(
           width: double.infinity,
+          // The one teal fill on this screen.
           child: ElevatedButton.icon(
+            style: AppTheme.signalButton,
             onPressed: !walletActive
                 ? null
                 : () async {

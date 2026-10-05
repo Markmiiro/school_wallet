@@ -43,6 +43,7 @@ dependencies:
   intl: ^0.19.0
   flutter_animate: ^4.5.0
   nfc_manager: ^4.0.2
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -65,6 +66,12 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Brand marks rendered by the app (flutter_svg). The paths are named in
+  # lib/core/constants/brand_assets.dart.
+  assets:
+    - assets/brand/nuvora-mark.svg
+    - assets/brand/nuvora-mark-reversed.svg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

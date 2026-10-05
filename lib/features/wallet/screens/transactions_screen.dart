@@ -238,14 +238,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           selected: on,
           showCheckmark: false,
           onSelected: (_) => setState(() => _studentId = id),
-          selectedColor: AppColors.secondaryContainer,
+          // The chosen chip is navy with a white label. A blue fill
+          // would put a 14px label on blue, which the book allows for
+          // large text only.
+          selectedColor: AppColors.primary,
           backgroundColor: AppColors.surfaceContainerLowest,
           side: BorderSide(
-            color: on ? AppColors.secondaryContainer : AppColors.level1CardBorder,
+            color: on ? AppColors.primary : AppColors.level1CardBorder,
           ),
           labelStyle: AppTheme.bodySm.copyWith(
             fontWeight: FontWeight.w600,
-            color: on ? AppColors.onSecondaryContainer : AppColors.onSurface,
+            color: on ? AppColors.onPrimary : AppColors.onSurface,
           ),
         ),
       );

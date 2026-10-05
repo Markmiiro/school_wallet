@@ -1,19 +1,38 @@
 // Nuvora colour tokens — the ONE place colour values are defined.
 //
-// NuvoraPalette holds the raw brand values. AppColors maps them onto the
-// roles the screens and AppTheme use. Screens reference AppColors only;
-// nothing outside this file should write a Color(0x...) literal.
+// NuvoraPalette holds the raw values from the brand book. AppColors maps
+// them onto the roles the screens and AppTheme use. Screens reference
+// AppColors only; nothing outside this file should write a Color(0x...)
+// literal. test/brand_palette_test.dart fails if any of this drifts.
 //
-// The same navy-900 value is repeated as a literal in web/index.html
-// (theme-color) and web/manifest.json (theme_color, background_color),
-// because those files cannot reference Dart. Change it there too.
+// The navy value is repeated as a literal in web/index.html (theme-color)
+// and web/manifest.json (theme_color, background_color), because those
+// files cannot reference Dart. Change it there too.
 //
-// Contrast rules (WCAG ratios, measured):
-//   teal400 on white    2.12  FAILS as text — use it only as a fill
-//   teal400 on navy700  6.38  fine for text and icons on navy
-//   navy900 on teal400  7.08  the pairing for a teal button
-//   teal700 on white    5.23  teal-coloured text on light backgrounds
-//   white   on navy700 13.52
+// ROLES (brand book)
+//   navy   trust, ground: the nav bar, headers, icons and text on light.
+//   blue   the accent: fills the primary button, the active tab and the
+//          balance card.
+//   teal   a signal, not an accent: "marks the thing that worked, nothing
+//          else". Once on a typical screen: the Top up button, or the
+//          mark on a cleared transaction. Two teal fills on one screen
+//          means one is wrong.
+//   Rough share of a screen: 60 neutral / 25 navy / 10 blue / 5 teal.
+//
+// CONTRAST (WCAG ratios, measured; the test holds these)
+//   blue  on white   3.34  not body text. A fill, or a 24px+ heading.
+//                          Blue as sentence text is blueText (6.33).
+//   teal  on white   2.12  never text on light. Teal type is tealText (4.50).
+//   white on teal    2.12  never, at any size.
+//   white on blue    3.34  large text only; navy on blue (4.13) is preferred
+//                          and is what every label on blue uses. It is
+//                          still "large only": primary button labels are
+//                          navy, weight 700, 17px or more.
+//   navy  on teal    6.51  the label on a teal button.
+//   white on navy   13.80
+//
+// The gradients inside assets/brand/*.svg belong to the mark. The book
+// says not to sample them for UI; none of their values appear here.
 
 import 'package:flutter/material.dart';
 
@@ -21,20 +40,24 @@ import 'package:flutter/material.dart';
 class NuvoraPalette {
   NuvoraPalette._();
 
-  // Brand
-  static const Color navy900 = Color(0xFF0D2551); // deepest ground, headers, status bar
-  static const Color navy700 = Color(0xFF142D5A); // primary surface, balance card
-  static const Color navy500 = Color(0xFF1D3A6B); // raised surface, borders on navy
-  static const Color teal400 = Color(0xFF10C8B0); // accent: CTAs, active nav, highlights
-  static const Color teal700 = Color(0xFF0B7A6D); // accent as TEXT on light backgrounds
-  static const Color ink = Color(0xFF0F1B2E); // body text on light
-  static const Color slate = Color(0xFF5A6B85); // secondary text
-  static const Color mist = Color(0xFFEEF2F6); // light page ground
+  // The three brand colours.
+  static const Color navy = Color(0xFF102B5C); // trust, ground
+  static const Color blue = Color(0xFF168FF5); // accent
+  static const Color teal = Color(0xFF12C8B0); // signal
+
+  // The same blue and teal, darkened by the book for use as TEXT on light.
+  static const Color blueText = Color(0xFF1061AB);
+  static const Color tealText = Color(0xFF0D857C);
+
+  // Neutrals.
+  static const Color surfaceSunken = Color(0xFFF4F7FA); // page ground
+  static const Color border = Color(0xFFE6ECF3); // hairlines, quiet fills
+  static const Color ink = Color(0xFF172033); // body text on light
+  static const Color inkMuted = Color(0xFF64748B); // secondary text
   static const Color white = Color(0xFFFFFFFF);
 
-  // Derived from the brand values above, not separate brand colours.
+  // Derived, not a separate brand colour.
   static const Color white70 = Color(0xB3FFFFFF); // muted text on navy
-  static const Color line = Color(0xFFDEE1E7); // slate at 20% over white: hairlines on light
 
   // Destructive only (Log Out, errors). Not part of the brand.
   static const Color red = Color(0xFFBA1A1A);
@@ -54,42 +77,45 @@ class AppColors {
   AppColors._(); // prevent instantiation
 
   // Surfaces
-  static const Color background = NuvoraPalette.mist;
-  static const Color surface = NuvoraPalette.mist;
+  static const Color background = NuvoraPalette.surfaceSunken;
+  static const Color surface = NuvoraPalette.surfaceSunken;
   static const Color surfaceContainerLowest = NuvoraPalette.white; // cards, inputs
   static const Color surfaceContainer = NuvoraPalette.white;
-  static const Color surfaceContainerHighest = NuvoraPalette.line;
+  static const Color surfaceContainerHighest = NuvoraPalette.border;
 
   static const Color onSurface = NuvoraPalette.ink;
-  static const Color onSurfaceVariant = NuvoraPalette.slate;
-  static const Color inverseSurface = NuvoraPalette.navy900;
+  static const Color onSurfaceVariant = NuvoraPalette.inkMuted;
+  static const Color inverseSurface = NuvoraPalette.navy;
   static const Color inverseOnSurface = NuvoraPalette.white;
 
-  static const Color outline = NuvoraPalette.slate;
-  static const Color outlineVariant = NuvoraPalette.line;
+  static const Color outline = NuvoraPalette.inkMuted;
+  static const Color outlineVariant = NuvoraPalette.border;
 
-  // Primary — navy. Headers, icons and text on light, outlined buttons.
-  static const Color primary = NuvoraPalette.navy900;
+  // Navy — the ground. Headers, the nav bar, the lock screen, icons and
+  // text on light, outlined buttons. One navy: the book has no second.
+  static const Color primary = NuvoraPalette.navy;
   static const Color onPrimary = NuvoraPalette.white;
-  // The navy surface: balance card, hero cards.
-  static const Color primaryContainer = NuvoraPalette.navy700;
+  static const Color primaryContainer = NuvoraPalette.navy;
   static const Color onPrimaryContainer = NuvoraPalette.white;
   static const Color onPrimaryContainerMuted = NuvoraPalette.white70;
-  static const Color inversePrimary = NuvoraPalette.teal400;
 
-  // Secondary — teal. `secondary` is the text-safe teal for light
-  // backgrounds; `secondaryContainer` is the teal FILL and must only ever
-  // carry `onSecondaryContainer` (navy) on top, never white.
-  static const Color secondary = NuvoraPalette.teal700;
-  static const Color onSecondary = NuvoraPalette.white;
-  static const Color secondaryContainer = NuvoraPalette.teal400;
-  static const Color onSecondaryContainer = NuvoraPalette.navy900;
+  // Blue — the accent. `accent` is a FILL (primary button, active tab,
+  // selected chip, the focus ring on navy) and carries `onAccent` (navy),
+  // never white at label size. `accentText` is blue for sentence text.
+  static const Color accent = NuvoraPalette.blue;
+  static const Color onAccent = NuvoraPalette.navy;
+  static const Color accentText = NuvoraPalette.blueText;
 
-  // Tertiary — raised navy.
-  static const Color tertiary = NuvoraPalette.navy500;
-  static const Color onTertiary = NuvoraPalette.white;
-  static const Color tertiaryContainer = NuvoraPalette.navy500;
-  static const Color onTertiaryContainer = NuvoraPalette.white;
+  // The balance card is blue; everything written on it is navy.
+  static const Color balanceCard = NuvoraPalette.blue;
+  static const Color onBalanceCard = NuvoraPalette.navy;
+
+  // Teal — the signal. `signal` is a FILL and carries `onSignal` (navy),
+  // never white. `signalText` is teal for type and for marks on white.
+  // Use it for the thing that worked and for the Top up button only.
+  static const Color signal = NuvoraPalette.teal;
+  static const Color onSignal = NuvoraPalette.navy;
+  static const Color signalText = NuvoraPalette.tealText;
 
   // Functional — red is reserved for destructive actions and errors.
   static const Color error = NuvoraPalette.red;
@@ -97,16 +123,22 @@ class AppColors {
   static const Color errorContainer = NuvoraPalette.redTint;
   static const Color onErrorContainer = NuvoraPalette.redDeep;
 
-  static const Color success = NuvoraPalette.teal700;
+  // "It worked": the tick after a payment, an active card.
+  static const Color success = NuvoraPalette.tealText;
 
-  // Money direction in transaction lists and totals.
-  static const Color moneyIn = NuvoraPalette.teal700;
+  // Amounts in transaction lists and totals are ink either way; the sign
+  // says the direction. A top-up that went through carries the one teal
+  // mark on its row (`cleared`), not a teal amount as well.
+  static const Color moneyIn = NuvoraPalette.ink;
   static const Color moneyOut = NuvoraPalette.ink;
+  static const Color cleared = NuvoraPalette.tealText;
 
-  // Bottom navigation (sits on navy).
-  static const Color navBar = NuvoraPalette.navy900;
-  static const Color navBarIndicator = NuvoraPalette.navy500;
-  static const Color navBarActive = NuvoraPalette.teal400;
+  // Bottom navigation (sits on navy). The active tab is a blue pill with
+  // a navy icon; its label, below the pill on the bar, is white.
+  static const Color navBar = NuvoraPalette.navy;
+  static const Color navBarIndicator = NuvoraPalette.blue;
+  static const Color navBarActiveIcon = NuvoraPalette.navy;
+  static const Color navBarActiveLabel = NuvoraPalette.white;
   static const Color navBarInactive = NuvoraPalette.white70;
 
   // Buy a Card preview.
@@ -115,12 +147,12 @@ class AppColors {
   static const Color cardYellow = NuvoraPalette.cardYellow;
   static const Color cardRed = NuvoraPalette.cardRed;
   static const Color onCardFace = NuvoraPalette.white;
-  static const Color cardChip = NuvoraPalette.mist;
+  static const Color cardChip = NuvoraPalette.surfaceSunken;
 
   // Elevation helpers
-  static const Color level1CardBorder = NuvoraPalette.line;
+  static const Color level1CardBorder = NuvoraPalette.border;
   static BoxShadow level2Shadow = BoxShadow(
-    color: NuvoraPalette.navy900.withOpacity(0.08),
+    color: NuvoraPalette.navy.withOpacity(0.08),
     offset: const Offset(0, 4),
     blurRadius: 12,
   );

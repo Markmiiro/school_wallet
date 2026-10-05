@@ -312,7 +312,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(AppTheme.spaceLg),
       decoration: BoxDecoration(
-        color: AppColors.primaryContainer,
+        color: AppColors.balanceCard,
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         boxShadow: [AppColors.level2Shadow],
       ),
@@ -321,24 +321,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Positioned(
             right: 0, top: 0,
             child: Icon(Icons.shield_rounded,
-                color: AppColors.onPrimaryContainer.withOpacity(0.15), size: 28),
+                color: AppColors.onBalanceCard.withOpacity(0.15), size: 28),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Total family balance',
-                  style: AppTheme.bodySm.copyWith(color: AppColors.onPrimaryContainerMuted)),
+                  style: AppTheme.bodySm.copyWith(
+                      color: AppColors.onBalanceCard, fontWeight: FontWeight.w600)),
               const SizedBox(height: AppTheme.spaceXs),
               AnimatedBalanceCounter(
                 balance: _totalBalance,
-                style: AppTheme.displayCurrency.copyWith(color: AppColors.onPrimaryContainer),
+                style: AppTheme.displayCurrency.copyWith(color: AppColors.onBalanceCard),
               ),
               const SizedBox(height: AppTheme.spaceMd),
+              // The one teal fill on Home: blue and teal sit together
+              // here, and teal is the smaller of the two.
               ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondaryContainer,
-                  foregroundColor: AppColors.onSecondaryContainer,
-                  minimumSize: const Size(0, 40),
+                style: AppTheme.signalButton.copyWith(
+                  minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
                 ),
                 onPressed: () => _topUp(wallet),
                 child: const Text('Top Up Wallet'),
@@ -358,7 +359,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        border: Border.all(color: AppColors.secondaryContainer, width: 2),
+        border: Border.all(color: AppColors.accent, width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,10 +370,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: AppTheme.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
           const SizedBox(height: AppTheme.spaceMd),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondaryContainer,
-              foregroundColor: AppColors.onSecondaryContainer,
-            ),
             onPressed: _openClaim,
             child: const Text('Add them'),
           ),

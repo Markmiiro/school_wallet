@@ -93,6 +93,19 @@ class AppTheme {
   static const double minTouchTarget = 48;
 
   // ── ThemeData ─────────────────────────────────────────────
+  /// The smallest and lightest a primary button's label may be.
+  static const double primaryButtonLabelSize = 17;
+  static TextStyle get primaryButtonLabel => bodyMd.copyWith(
+        fontSize: primaryButtonLabelSize,
+        fontWeight: FontWeight.w700,
+      );
+
+  /// The Top up button: the one teal fill a screen may have. Navy label.
+  static ButtonStyle get signalButton => ElevatedButton.styleFrom(
+        backgroundColor: AppColors.signal,
+        foregroundColor: AppColors.onSignal,
+      );
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -103,14 +116,17 @@ class AppTheme {
         onPrimary: AppColors.onPrimary,
         primaryContainer: AppColors.primaryContainer,
         onPrimaryContainer: AppColors.onPrimaryContainer,
-        secondary: AppColors.secondary,
-        onSecondary: AppColors.onSecondary,
-        secondaryContainer: AppColors.secondaryContainer,
-        onSecondaryContainer: AppColors.onSecondaryContainer,
-        tertiary: AppColors.tertiary,
-        onTertiary: AppColors.onTertiary,
-        tertiaryContainer: AppColors.tertiaryContainer,
-        onTertiaryContainer: AppColors.onTertiaryContainer,
+        // Material's "secondary" is the accent (blue) and its "tertiary"
+        // the signal (teal); the text-safe shade is the plain role and
+        // the fill is the container.
+        secondary: AppColors.accentText,
+        onSecondary: AppColors.onPrimary,
+        secondaryContainer: AppColors.accent,
+        onSecondaryContainer: AppColors.onAccent,
+        tertiary: AppColors.signalText,
+        onTertiary: AppColors.onPrimary,
+        tertiaryContainer: AppColors.signal,
+        onTertiaryContainer: AppColors.onSignal,
         error: AppColors.error,
         onError: AppColors.onError,
         errorContainer: AppColors.errorContainer,
@@ -123,7 +139,7 @@ class AppTheme {
         outlineVariant: AppColors.outlineVariant,
         inverseSurface: AppColors.inverseSurface,
         onInverseSurface: AppColors.inverseOnSurface,
-        inversePrimary: AppColors.inversePrimary,
+        inversePrimary: AppColors.accent,
       ),
 
       appBarTheme: AppBarTheme(
@@ -138,15 +154,17 @@ class AppTheme {
       ),
 
       elevatedButtonTheme: ElevatedButtonThemeData(
-        // Teal fill, navy label. Never white on teal — see app_colors.dart.
+        // The primary button: blue fill, navy label. Navy on blue is
+        // 4.13:1, "large only" in the brand book, so the label is never
+        // lighter than 700 or smaller than 17px. See app_colors.dart.
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.secondaryContainer,
-          foregroundColor: AppColors.onSecondaryContainer,
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.onAccent,
           minimumSize: const Size.fromHeight(minTouchTarget),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusDefault),
           ),
-          textStyle: bodyMd.copyWith(fontWeight: FontWeight.w700),
+          textStyle: primaryButtonLabel,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(

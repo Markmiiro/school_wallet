@@ -226,11 +226,9 @@ class GetStartedPanel extends StatelessWidget {
               if (copy.action != null) ...[
                 const SizedBox(height: AppTheme.spaceMd),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondaryContainer,
-                    foregroundColor: AppColors.onSecondaryContainer,
-                    minimumSize: const Size(0, 40),
-                  ),
+                  // A primary button like any other: blue. The teal Top
+                  // up on Home is the one on the balance card.
+                  style: ElevatedButton.styleFrom(minimumSize: const Size(0, 40)),
                   onPressed: busy ? null : _action(step),
                   child: busy
                       ? const SizedBox(

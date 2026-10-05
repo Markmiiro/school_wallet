@@ -41,16 +41,20 @@ class _MainShellState extends State<MainShell> {
           indicatorColor: AppColors.navBarIndicator,
           iconTheme: WidgetStateProperty.resolveWith(
             (states) => IconThemeData(
+              // The selected icon sits on the blue pill: navy on blue.
               color: states.contains(WidgetState.selected)
-                  ? AppColors.navBarActive
+                  ? AppColors.navBarActiveIcon
                   : AppColors.navBarInactive,
             ),
           ),
           labelTextStyle: WidgetStateProperty.resolveWith(
             (states) => AppTheme.bodySm.copyWith(
-              fontWeight: FontWeight.w500,
+              // The label is below the pill, on the navy bar.
+              fontWeight: states.contains(WidgetState.selected)
+                  ? FontWeight.w700
+                  : FontWeight.w500,
               color: states.contains(WidgetState.selected)
-                  ? AppColors.navBarActive
+                  ? AppColors.navBarActiveLabel
                   : AppColors.navBarInactive,
             ),
           ),
